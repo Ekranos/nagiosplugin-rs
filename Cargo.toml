@@ -1,6 +1,0 @@
-[package]
-name = "nagiosplugin"
-version = "0.1.0"
-authors = ["Marvin Lee Fimmel <kontakt@ekranos.me>"]
-
-[dependencies]
