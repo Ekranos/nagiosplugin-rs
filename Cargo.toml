@@ -1,0 +1,12 @@
+[package]
+name = "nagiosplugin"
+version = "0.1.0"
+authors = ["Marvin Lee Fimmel <kontakt@ekranos.me>"]
+documentation = "https://ekranos.github.io/nagiosplugin-rs/nagiosplugin/"
+license = "MIT/Apache-2.0"
+readme = "README.md"
+keywords = ["nagios", "icinga", "icinga2"]
+repository = "https://github.com/Ekranos/nagiosplugin-rs"
+description = "A small helper library to make it easy to write nagios/icinga checks."
+
+[dependencies]
