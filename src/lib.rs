@@ -295,6 +295,9 @@ impl<T> PartialOrdMetric<T>
 where
     T: PartialOrd + ToPerfString + Clone,
 {
+    /// Creates a new PartialOrdMetric from the given values.
+    ///
+    /// *In debug builds this will panic if you pass incorrect values for warning and critical.*
     pub fn new(
         name: &str,
         value: T,
