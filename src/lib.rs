@@ -20,7 +20,10 @@ mod macros;
 /// let m1 = SimpleMetric::new("test", Some(State::Ok), 12, None, None, None, None);
 /// let m2 = SimpleMetric::new("other", None, true, None, None, None, None);
 /// let resource = resource![m1, m2];
-/// assert_eq!(&resource.to_nagios_string(), "OK | test=12 other=true")
+/// assert_eq!(&resource.to_nagios_string(), "OK | test=12 other=true");
+///
+/// // Prints "OK | test=12 other=true" and exits with an exit code of 0 in this case
+/// resource.print_and_exit();
 /// # }
 /// ```
 pub struct Resource {
