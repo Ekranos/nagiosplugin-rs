@@ -610,6 +610,9 @@
 <span id="610">610</span>
 <span id="611">611</span>
 <span id="612">612</span>
+<span id="613">613</span>
+<span id="614">614</span>
+<span id="615">615</span>
 </pre><pre class="rust ">
 <span class="doccomment">//! The nagiosplugin crate provides some basic utilities to make it easier to write nagios checks.</span>
 
@@ -633,7 +636,10 @@
 <span class="doccomment">/// let m1 = SimpleMetric::new(&quot;test&quot;, Some(State::Ok), 12, None, None, None, None);</span>
 <span class="doccomment">/// let m2 = SimpleMetric::new(&quot;other&quot;, None, true, None, None, None, None);</span>
 <span class="doccomment">/// let resource = resource![m1, m2];</span>
-<span class="doccomment">/// assert_eq!(&amp;resource.to_nagios_string(), &quot;OK | test=12 other=true&quot;)</span>
+<span class="doccomment">/// assert_eq!(&amp;resource.to_nagios_string(), &quot;OK | test=12 other=true&quot;);</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// // Prints &quot;OK | test=12 other=true&quot; and exits with an exit code of 0 in this case</span>
+<span class="doccomment">/// resource.print_and_exit();</span>
 <span class="doccomment">/// # }</span>
 <span class="doccomment">/// ```</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Resource</span> {
