@@ -10,7 +10,7 @@ macro_rules! impl_to_perf_string_on_to_string {
     };
 }
 
-/// Let's you simply create a resource from multiple metrics. It's a bit like the vec! macro.
+/// Lets you simply create a resource from multiple metrics. It's a bit like the vec! macro.
 /// ```rust
 /// # #[macro_use]
 /// # extern crate nagiosplugin;
