@@ -1,5 +1,5 @@
 (function() {var implementors = {};
-implementors["nagiosplugin"] = [{text:"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/cmp/trait.PartialOrd.html\" title=\"trait core::cmp::PartialOrd\">PartialOrd</a> for <a class=\"enum\" href=\"nagiosplugin/enum.State.html\" title=\"enum nagiosplugin::State\">State</a>",synthetic:false,types:["nagiosplugin::State"]},];
+implementors["nagiosplugin"] = [{text:"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/cmp/trait.PartialOrd.html\" title=\"trait core::cmp::PartialOrd\">PartialOrd</a>&lt;<a class=\"enum\" href=\"nagiosplugin/enum.State.html\" title=\"enum nagiosplugin::State\">State</a>&gt; for <a class=\"enum\" href=\"nagiosplugin/enum.State.html\" title=\"enum nagiosplugin::State\">State</a>",synthetic:false,types:["nagiosplugin::State"]},];
 
             if (window.register_implementors) {
                 window.register_implementors(implementors);
