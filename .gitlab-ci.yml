@@ -17,18 +17,6 @@ rust-nightly:
   - cargo test --verbose
   allow_failure: true
 
-flathost:
-  stage: deploy
-  image: rust:latest
-  script:
-  - cargo doc --no-deps --verbose
-  - wget http://public.ekranos.me/flathost/flathost-client
-  - chmod +x flathost-client
-  - ./flathost-client -u $FLATHOST_URL -d target/doc -n nagiosplugin -t $FLATHOST_TOKEN
-  allow_failure: true
-  only:
-    - master
-
 pages:
   image: rust:latest
   stage: deploy
