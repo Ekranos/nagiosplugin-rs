@@ -46,7 +46,7 @@ macro_rules! metric_string {
                 s.push_str(&$tps.to_perf_string());
                 s.push(';');
             )*
-            s.trim_right_matches(';').to_string()
+            s.trim_end_matches(';').to_string()
         }
     };
 }

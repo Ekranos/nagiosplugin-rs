@@ -6,6 +6,9 @@ use std::process;
 #[macro_use]
 mod macros;
 
+mod helper;
+pub use crate::helper::{safe_run, safe_run_with_state};
+
 /// A Resource basically represents a single service if you view it from the perspective of nagios.
 /// If you init it without a state it will determine one from the given metrics.
 ///
