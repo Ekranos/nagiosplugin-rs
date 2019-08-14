@@ -62,6 +62,8 @@ impl Resource {
         &self.metrics
     }
 
+    /// Manually set the state for this resource. This disabled the automatic state determination
+    /// based on the included metrics of this resource.
     pub fn set_state(&mut self, state: State) {
         self.state = Some(state)
     }
@@ -88,6 +90,9 @@ impl Resource {
     }
 
     /// Will determine a State by the given metrics.
+    ///
+    /// In case a state is manually set for this resource,
+    /// it will return the manually set state instead.
     pub fn get_state(&self) -> State {
         let mut state = State::Unknown;
         if let Some(ref st) = self.state {
