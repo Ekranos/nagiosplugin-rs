@@ -53,7 +53,7 @@ macro_rules! metric_string {
 
 #[cfg(test)]
 mod tests {
-    use SimpleMetric;
+    use crate::SimpleMetric;
 
     #[test]
     fn test_resource_macro() {

@@ -31,7 +31,7 @@ pub use crate::helper::{safe_run, safe_run_with_state};
 /// ```
 pub struct Resource {
     state: Option<State>,
-    metrics: Vec<Box<ResourceMetric>>,
+    metrics: Vec<Box<dyn ResourceMetric>>,
     description: Option<String>,
 }
 
@@ -58,7 +58,7 @@ impl Resource {
     }
 
     /// Returns a slice of the pushed metrics.
-    pub fn metrics(&self) -> &[Box<ResourceMetric>] {
+    pub fn metrics(&self) -> &[Box<dyn ResourceMetric>] {
         &self.metrics
     }
 
