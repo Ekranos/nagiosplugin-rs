@@ -616,6 +616,11 @@
 <span id="616">616</span>
 <span id="617">617</span>
 <span id="618">618</span>
+<span id="619">619</span>
+<span id="620">620</span>
+<span id="621">621</span>
+<span id="622">622</span>
+<span id="623">623</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! The nagiosplugin crate provides some basic utilities to make it easier to write nagios checks.</span>
 
@@ -681,6 +686,8 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">metrics</span>
     }
 
+    <span class="doccomment">/// Manually set the state for this resource. This disabled the automatic state determination</span>
+    <span class="doccomment">/// based on the included metrics of this resource.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_state</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">state</span>: <span class="ident">State</span>) {
         <span class="self">self</span>.<span class="ident">state</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">state</span>)
     }
@@ -707,6 +714,9 @@
     }
 
     <span class="doccomment">/// Will determine a State by the given metrics.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// In case a state is manually set for this resource,</span>
+    <span class="doccomment">/// it will return the manually set state instead.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">State</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">state</span> <span class="op">=</span> <span class="ident">State</span>::<span class="ident">Unknown</span>;
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">st</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">state</span> {
