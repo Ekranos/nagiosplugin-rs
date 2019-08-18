@@ -218,7 +218,7 @@ pub trait ToPerfString {
     fn to_perf_string(&self) -> String;
 }
 
-impl_to_perf_string_on_to_string!(bool);
+impl_to_perf_string_on_to_string!(bool, usize);
 impl_to_perf_string_on_to_string!(u8, u16, u32, u64, u128);
 impl_to_perf_string_on_to_string!(i8, i16, i32, i64, i128);
 impl_to_perf_string_on_to_string!(f32, f64);
