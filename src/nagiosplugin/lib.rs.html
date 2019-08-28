@@ -621,6 +621,27 @@
 <span id="621">621</span>
 <span id="622">622</span>
 <span id="623">623</span>
+<span id="624">624</span>
+<span id="625">625</span>
+<span id="626">626</span>
+<span id="627">627</span>
+<span id="628">628</span>
+<span id="629">629</span>
+<span id="630">630</span>
+<span id="631">631</span>
+<span id="632">632</span>
+<span id="633">633</span>
+<span id="634">634</span>
+<span id="635">635</span>
+<span id="636">636</span>
+<span id="637">637</span>
+<span id="638">638</span>
+<span id="639">639</span>
+<span id="640">640</span>
+<span id="641">641</span>
+<span id="642">642</span>
+<span id="643">643</span>
+<span id="644">644</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! The nagiosplugin crate provides some basic utilities to make it easier to write nagios checks.</span>
 
@@ -655,8 +676,9 @@
 <span class="doccomment">/// ```</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Resource</span> {
     <span class="ident">state</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span>,
-    <span class="ident">metrics</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">ResourceMetric</span><span class="op">&gt;&gt;</span>,
+    <span class="ident">metrics</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">ResourceMetric</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">description</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
+    <span class="ident">name</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">Resource</span> {
@@ -665,11 +687,12 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// If you want to create a Resource from some metrics with automatic determination of the</span>
     <span class="doccomment">/// state you can use the *resource!* macro.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">state</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span>, <span class="ident">description</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span>) <span class="op">-&gt;</span> <span class="ident">Resource</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">state</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span>, <span class="ident">description</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Resource</span> {
         <span class="ident">Resource</span> {
             <span class="ident">state</span>,
             <span class="ident">metrics</span>: <span class="ident">Vec</span>::<span class="ident">new</span>(),
             <span class="ident">description</span>: <span class="ident">description</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">d</span><span class="op">|</span> <span class="ident">d</span>.<span class="ident">to_owned</span>()),
+            <span class="ident">name</span>: <span class="prelude-val">None</span>,
         }
     }
 
@@ -682,7 +705,7 @@
     }
 
     <span class="doccomment">/// Returns a slice of the pushed metrics.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">metrics</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="kw-2">&amp;</span>[<span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">ResourceMetric</span><span class="op">&gt;</span>] {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">metrics</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span>[<span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">ResourceMetric</span><span class="op">&gt;</span>] {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">metrics</span>
     }
 
@@ -692,22 +715,34 @@
         <span class="self">self</span>.<span class="ident">state</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">state</span>)
     }
 
+    <span class="doccomment">/// Set the name of this resource. Will be included in the final string output.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_name</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) {
+        <span class="self">self</span>.<span class="ident">name</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">name</span>.<span class="ident">to_owned</span>())
+    }
+
     <span class="doccomment">/// Returns a string which nagios understands to determine the service state.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// This function will automatically determine which service state is appropriate based on the</span>
     <span class="doccomment">/// included metrics. If state has been set manually it will always use the manually set state.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_nagios_string</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">String</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_nagios_string</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">String</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">s</span> <span class="op">=</span> <span class="ident">String</span>::<span class="ident">new</span>();
+
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">name</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">name</span> {
+            <span class="ident">s</span>.<span class="ident">push_str</span>(<span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{} &quot;</span>, <span class="ident">name</span>))
+        }
+
         <span class="ident">s</span>.<span class="ident">push_str</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">get_state</span>().<span class="ident">to_string</span>());
 
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">description</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">description</span> {
             <span class="ident">s</span>.<span class="ident">push_str</span>(<span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;: {}&quot;</span>, <span class="ident">description</span>));
         }
 
-        <span class="ident">s</span>.<span class="ident">push_str</span>(<span class="string">&quot; |&quot;</span>);
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">metrics</span>.<span class="ident">len</span>() <span class="op">&gt;</span> <span class="number">0</span> {
+            <span class="ident">s</span>.<span class="ident">push_str</span>(<span class="string">&quot; |&quot;</span>);
 
-        <span class="kw">for</span> <span class="ident">metric</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">metrics</span>.<span class="ident">iter</span>() {
-            <span class="ident">s</span>.<span class="ident">push_str</span>(<span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot; {}&quot;</span>, <span class="ident">metric</span>.<span class="ident">perf_string</span>()));
+            <span class="kw">for</span> <span class="ident">metric</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">metrics</span>.<span class="ident">iter</span>() {
+                <span class="ident">s</span>.<span class="ident">push_str</span>(<span class="kw-2">&amp;</span><span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot; {}&quot;</span>, <span class="ident">metric</span>.<span class="ident">perf_string</span>()));
+            }
         }
 
         <span class="ident">s</span>
@@ -717,7 +752,7 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// In case a state is manually set for this resource,</span>
     <span class="doccomment">/// it will return the manually set state instead.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">State</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">State</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">state</span> <span class="op">=</span> <span class="ident">State</span>::<span class="ident">Unknown</span>;
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">st</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">state</span> {
             <span class="ident">state</span> <span class="op">=</span> <span class="ident">st</span>.<span class="ident">clone</span>()
@@ -734,7 +769,7 @@
     }
 
     <span class="doccomment">/// Get the description of this resource.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_description</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">String</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_description</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">String</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">description</span>.<span class="ident">as_ref</span>()
     }
 
@@ -744,7 +779,7 @@
     }
 
     <span class="doccomment">/// Will return the exit code of the determined state via Self::state.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">exit_code</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">i32</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">exit_code</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">i32</span> {
         <span class="self">self</span>.<span class="ident">get_state</span>().<span class="ident">exit_code</span>()
     }
 
@@ -756,7 +791,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">Resource</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="ident">Resource</span>::<span class="ident">new</span>(<span class="prelude-val">None</span>, <span class="prelude-val">None</span>)
     }
 }
@@ -764,9 +799,9 @@
 <span class="doccomment">/// Represents a single metric of a resource. You shouldn&#39;t need to implement this by yourself</span>
 <span class="doccomment">/// since the crate provided types already implement this.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ResourceMetric</span> {
-    <span class="kw">fn</span> <span class="ident">perf_string</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">String</span>;
-    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="kw-2">&amp;</span><span class="ident">str</span>;
-    <span class="kw">fn</span> <span class="ident">state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">perf_string</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">String</span>;
+    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">str</span>;
+    <span class="kw">fn</span> <span class="ident">state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span>;
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">O</span><span class="op">&gt;</span> <span class="ident">ResourceMetric</span> <span class="kw">for</span> <span class="ident">T</span>
@@ -774,15 +809,15 @@
     <span class="ident">O</span>: <span class="ident">ToPerfString</span>,
     <span class="ident">T</span>: <span class="ident">Metric</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="ident">O</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">ToPerfString</span>,
 {
-    <span class="kw">fn</span> <span class="ident">perf_string</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">String</span> {
+    <span class="kw">fn</span> <span class="ident">perf_string</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">String</span> {
         <span class="self">self</span>.<span class="ident">to_perf_string</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="kw-2">&amp;</span><span class="ident">str</span> {
+    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">str</span> {
         <span class="self">self</span>.<span class="ident">name</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">state</span>()
     }
 }
@@ -798,34 +833,34 @@
 
 <span class="kw">impl</span> <span class="ident">State</span> {
     <span class="doccomment">/// Returns the corresponding nagios exit code to signal the service state of self.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">exit_code</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">i32</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">exit_code</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">i32</span> {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="kw-2">&amp;</span><span class="ident">State</span>::<span class="prelude-val">Ok</span> <span class="op">=&gt;</span> <span class="number">0</span>,
-            <span class="kw-2">&amp;</span><span class="ident">State</span>::<span class="ident">Warning</span> <span class="op">=&gt;</span> <span class="number">1</span>,
-            <span class="kw-2">&amp;</span><span class="ident">State</span>::<span class="ident">Critical</span> <span class="op">=&gt;</span> <span class="number">2</span>,
-            <span class="kw-2">&amp;</span><span class="ident">State</span>::<span class="ident">Unknown</span> <span class="op">=&gt;</span> <span class="number">3</span>,
+            <span class="kw-2">&amp;</span><span class="ident">State</span>::<span class="prelude-val">Ok</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0</span>,
+            <span class="kw-2">&amp;</span><span class="ident">State</span>::<span class="ident">Warning</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">1</span>,
+            <span class="kw-2">&amp;</span><span class="ident">State</span>::<span class="ident">Critical</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">2</span>,
+            <span class="kw-2">&amp;</span><span class="ident">State</span>::<span class="ident">Unknown</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">3</span>,
         }
     }
 }
 
 <span class="kw">impl</span> <span class="ident">ToString</span> <span class="kw">for</span> <span class="ident">State</span> {
-    <span class="kw">fn</span> <span class="ident">to_string</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">String</span> {
+    <span class="kw">fn</span> <span class="ident">to_string</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">String</span> {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">State</span>::<span class="prelude-val">Ok</span> <span class="op">=&gt;</span> <span class="string">&quot;OK&quot;</span>.<span class="ident">to_owned</span>(),
-            <span class="ident">State</span>::<span class="ident">Warning</span> <span class="op">=&gt;</span> <span class="string">&quot;WARNING&quot;</span>.<span class="ident">to_owned</span>(),
-            <span class="ident">State</span>::<span class="ident">Critical</span> <span class="op">=&gt;</span> <span class="string">&quot;CRITICAL&quot;</span>.<span class="ident">to_owned</span>(),
-            <span class="ident">State</span>::<span class="ident">Unknown</span> <span class="op">=&gt;</span> <span class="string">&quot;UNKNOWN&quot;</span>.<span class="ident">to_owned</span>(),
+            <span class="ident">State</span>::<span class="prelude-val">Ok</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;OK&quot;</span>.<span class="ident">to_owned</span>(),
+            <span class="ident">State</span>::<span class="ident">Warning</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;WARNING&quot;</span>.<span class="ident">to_owned</span>(),
+            <span class="ident">State</span>::<span class="ident">Critical</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;CRITICAL&quot;</span>.<span class="ident">to_owned</span>(),
+            <span class="ident">State</span>::<span class="ident">Unknown</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;UNKNOWN&quot;</span>.<span class="ident">to_owned</span>(),
         }
     }
 }
 
 <span class="kw">impl</span> <span class="ident">PartialOrd</span> <span class="kw">for</span> <span class="ident">State</span> {
-    <span class="kw">fn</span> <span class="ident">partial_cmp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">State</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">partial_cmp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">State</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">f</span> <span class="op">=</span> <span class="op">|</span><span class="ident">state</span><span class="op">|</span> <span class="kw">match</span> <span class="ident">state</span> {
-            <span class="kw-2">&amp;</span><span class="ident">State</span>::<span class="ident">Unknown</span> <span class="op">=&gt;</span> <span class="number">0</span>,
-            <span class="kw-2">&amp;</span><span class="ident">State</span>::<span class="prelude-val">Ok</span> <span class="op">=&gt;</span> <span class="number">1</span>,
-            <span class="kw-2">&amp;</span><span class="ident">State</span>::<span class="ident">Warning</span> <span class="op">=&gt;</span> <span class="number">2</span>,
-            <span class="kw-2">&amp;</span><span class="ident">State</span>::<span class="ident">Critical</span> <span class="op">=&gt;</span> <span class="number">3</span>,
+            <span class="kw-2">&amp;</span><span class="ident">State</span>::<span class="ident">Unknown</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0</span>,
+            <span class="kw-2">&amp;</span><span class="ident">State</span>::<span class="prelude-val">Ok</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">1</span>,
+            <span class="kw-2">&amp;</span><span class="ident">State</span>::<span class="ident">Warning</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">2</span>,
+            <span class="kw-2">&amp;</span><span class="ident">State</span>::<span class="ident">Critical</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">3</span>,
         };
 
         <span class="ident">f</span>(<span class="self">self</span>).<span class="ident">partial_cmp</span>(<span class="kw-2">&amp;</span><span class="ident">f</span>(<span class="ident">other</span>))
@@ -839,7 +874,7 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// It&#39;s already implemented for some basic types.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ToPerfString</span> {
-    <span class="kw">fn</span> <span class="ident">to_perf_string</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">String</span>;
+    <span class="kw">fn</span> <span class="ident">to_perf_string</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">String</span>;
 }
 
 <span class="macro">impl_to_perf_string_on_to_string</span><span class="macro">!</span>(<span class="ident">bool</span>, <span class="ident">usize</span>);
@@ -849,7 +884,7 @@
 <span class="macro">impl_to_perf_string_on_to_string</span><span class="macro">!</span>(<span class="ident">String</span>);
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">ToPerfString</span> <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span> {
-    <span class="kw">fn</span> <span class="ident">to_perf_string</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">String</span> {
+    <span class="kw">fn</span> <span class="ident">to_perf_string</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">String</span> {
         <span class="self">self</span>.<span class="ident">to_string</span>()
     }
 }
@@ -859,7 +894,7 @@
     <span class="ident">O</span>: <span class="ident">ToPerfString</span>,
     <span class="ident">T</span>: <span class="ident">Metric</span><span class="op">&lt;</span><span class="ident">Output</span> <span class="op">=</span> <span class="ident">O</span><span class="op">&gt;</span>,
 {
-    <span class="kw">fn</span> <span class="ident">to_perf_string</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">String</span> {
+    <span class="kw">fn</span> <span class="ident">to_perf_string</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">String</span> {
         <span class="macro">metric_string</span><span class="macro">!</span>(
             <span class="self">self</span>.<span class="ident">name</span>(),
             <span class="self">self</span>.<span class="ident">value</span>(),
@@ -875,10 +910,10 @@
 <span class="kw">where</span>
     <span class="ident">T</span>: <span class="ident">ToPerfString</span>,
 {
-    <span class="kw">fn</span> <span class="ident">to_perf_string</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="ident">String</span> {
+    <span class="kw">fn</span> <span class="ident">to_perf_string</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">String</span> {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">s</span>) <span class="op">=&gt;</span> <span class="ident">s</span>.<span class="ident">to_perf_string</span>(),
-            <span class="prelude-val">None</span> <span class="op">=&gt;</span> <span class="ident">String</span>::<span class="ident">new</span>(),
+            <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">s</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">s</span>.<span class="ident">to_perf_string</span>(),
+            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">String</span>::<span class="ident">new</span>(),
         }
     }
 }
@@ -889,13 +924,13 @@
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Metric</span> {
     <span class="kw">type</span> <span class="ident">Output</span>: <span class="ident">ToPerfString</span>;
 
-    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="kw-2">&amp;</span><span class="ident">str</span>;
-    <span class="kw">fn</span> <span class="ident">state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span>;
-    <span class="kw">fn</span> <span class="ident">value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="self">Self</span>::<span class="ident">Output</span>;
-    <span class="kw">fn</span> <span class="ident">warning</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Output</span><span class="op">&gt;</span>;
-    <span class="kw">fn</span> <span class="ident">critical</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Output</span><span class="op">&gt;</span>;
-    <span class="kw">fn</span> <span class="ident">min</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Output</span><span class="op">&gt;</span>;
-    <span class="kw">fn</span> <span class="ident">max</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Output</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">str</span>;
+    <span class="kw">fn</span> <span class="ident">state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>::<span class="ident">Output</span>;
+    <span class="kw">fn</span> <span class="ident">warning</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Output</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">critical</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Output</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">min</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Output</span><span class="op">&gt;</span>;
+    <span class="kw">fn</span> <span class="ident">max</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span>::<span class="ident">Output</span><span class="op">&gt;</span>;
 }
 
 <span class="doccomment">/// A PartialOrdMetric is a metric which will automatically calculate the State</span>
@@ -941,21 +976,21 @@
         <span class="ident">min</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
         <span class="ident">max</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
         <span class="ident">lower_is_critical</span>: <span class="ident">bool</span>,
-    ) <span class="op">-&gt;</span> <span class="self">Self</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
         {
-            <span class="kw">if</span> <span class="ident">warning</span>.<span class="ident">is_some</span>() <span class="op">&amp;&amp;</span> <span class="ident">critical</span>.<span class="ident">is_some</span>() {
+            <span class="kw">if</span> <span class="ident">warning</span>.<span class="ident">is_some</span>() <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="ident">critical</span>.<span class="ident">is_some</span>() {
                 <span class="kw">let</span> <span class="ident">warning</span> <span class="op">=</span> <span class="ident">warning</span>.<span class="ident">clone</span>().<span class="ident">unwrap</span>();
                 <span class="kw">let</span> <span class="ident">critical</span> <span class="op">=</span> <span class="ident">critical</span>.<span class="ident">clone</span>().<span class="ident">unwrap</span>();
 
-                <span class="kw">if</span> <span class="ident">lower_is_critical</span> <span class="op">&amp;&amp;</span> <span class="ident">warning</span> <span class="op">&lt;</span> <span class="ident">critical</span> {
+                <span class="kw">if</span> <span class="ident">lower_is_critical</span> <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="ident">warning</span> <span class="op">&lt;</span> <span class="ident">critical</span> {
                     <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;lower_is_critical is set to true while warning is lower than critical, this is not correct&quot;</span>);
-                } <span class="kw">else</span> <span class="kw">if</span> <span class="op">!</span><span class="ident">lower_is_critical</span> <span class="op">&amp;&amp;</span> <span class="ident">warning</span> <span class="op">&gt;</span> <span class="ident">critical</span> {
+                } <span class="kw">else</span> <span class="kw">if</span> <span class="op">!</span><span class="ident">lower_is_critical</span> <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="ident">warning</span> <span class="op">&gt;</span> <span class="ident">critical</span> {
                     <span class="macro">panic</span><span class="macro">!</span>(<span class="string">&quot;lower_is_critical is set to false while warning is lower than critical, this is not correct&quot;</span>);
                 }
             }
 
-            <span class="kw">if</span> <span class="ident">min</span>.<span class="ident">is_some</span>() <span class="op">&amp;&amp;</span> <span class="ident">max</span>.<span class="ident">is_some</span>() {
+            <span class="kw">if</span> <span class="ident">min</span>.<span class="ident">is_some</span>() <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="ident">max</span>.<span class="ident">is_some</span>() {
                 <span class="kw">let</span> <span class="ident">min</span> <span class="op">=</span> <span class="ident">min</span>.<span class="ident">clone</span>().<span class="ident">unwrap</span>();
                 <span class="kw">let</span> <span class="ident">max</span> <span class="op">=</span> <span class="ident">max</span>.<span class="ident">clone</span>().<span class="ident">unwrap</span>();
 
@@ -981,18 +1016,18 @@
 {
     <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">T</span>;
 
-    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="kw-2">&amp;</span><span class="ident">str</span> {
+    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">str</span> {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">name</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">critical</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">critical</span> {
             <span class="kw">if</span> <span class="self">self</span>.<span class="ident">lower_is_critical</span> {
-                <span class="kw">if</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">value</span> <span class="op">&lt;=</span> <span class="ident">critical</span> {
+                <span class="kw">if</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">value</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">critical</span> {
                     <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">State</span>::<span class="ident">Critical</span>);
                 }
             } <span class="kw">else</span> {
-                <span class="kw">if</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">value</span> <span class="op">&gt;=</span> <span class="ident">critical</span> {
+                <span class="kw">if</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">value</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">critical</span> {
                     <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">State</span>::<span class="ident">Critical</span>);
                 }
             }
@@ -1000,11 +1035,11 @@
 
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">warning</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">warning</span> {
             <span class="kw">if</span> <span class="self">self</span>.<span class="ident">lower_is_critical</span> {
-                <span class="kw">if</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">value</span> <span class="op">&lt;=</span> <span class="ident">warning</span> {
+                <span class="kw">if</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">value</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">warning</span> {
                     <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">State</span>::<span class="ident">Warning</span>);
                 }
             } <span class="kw">else</span> {
-                <span class="kw">if</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">value</span> <span class="op">&gt;=</span> <span class="ident">warning</span> {
+                <span class="kw">if</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">value</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">warning</span> {
                     <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">State</span>::<span class="ident">Warning</span>);
                 }
             }
@@ -1013,23 +1048,23 @@
         <span class="prelude-val">Some</span>(<span class="ident">State</span>::<span class="prelude-val">Ok</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="op">&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">Metric</span><span class="op">&gt;</span>::<span class="ident">Output</span> {
+    <span class="kw">fn</span> <span class="ident">value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="op">&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">Metric</span><span class="op">&gt;</span>::<span class="ident">Output</span> {
         <span class="self">self</span>.<span class="ident">value</span>.<span class="ident">clone</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">warning</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">Metric</span><span class="op">&gt;</span>::<span class="ident">Output</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">warning</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">Metric</span><span class="op">&gt;</span>::<span class="ident">Output</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">warning</span>.<span class="ident">clone</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">critical</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">Metric</span><span class="op">&gt;</span>::<span class="ident">Output</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">critical</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">Metric</span><span class="op">&gt;</span>::<span class="ident">Output</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">critical</span>.<span class="ident">clone</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">min</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">Metric</span><span class="op">&gt;</span>::<span class="ident">Output</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">min</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">Metric</span><span class="op">&gt;</span>::<span class="ident">Output</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">min</span>.<span class="ident">clone</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">max</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">Metric</span><span class="op">&gt;</span>::<span class="ident">Output</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">max</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">Metric</span><span class="op">&gt;</span>::<span class="ident">Output</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">max</span>.<span class="ident">clone</span>()
     }
 }
@@ -1062,7 +1097,7 @@
         <span class="ident">critical</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
         <span class="ident">min</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
         <span class="ident">max</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
-    ) <span class="op">-&gt;</span> <span class="self">Self</span> {
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="ident">SimpleMetric</span> {
             <span class="ident">name</span>: <span class="ident">name</span>.<span class="ident">to_owned</span>(),
             <span class="ident">state</span>,
@@ -1081,31 +1116,31 @@
 {
     <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">T</span>;
 
-    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="kw-2">&amp;</span><span class="ident">str</span> {
+    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">str</span> {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">name</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">State</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">state</span>.<span class="ident">clone</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="op">&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">Metric</span><span class="op">&gt;</span>::<span class="ident">Output</span> {
+    <span class="kw">fn</span> <span class="ident">value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="op">&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">Metric</span><span class="op">&gt;</span>::<span class="ident">Output</span> {
         <span class="self">self</span>.<span class="ident">value</span>.<span class="ident">clone</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">warning</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">Metric</span><span class="op">&gt;</span>::<span class="ident">Output</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">warning</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">Metric</span><span class="op">&gt;</span>::<span class="ident">Output</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">warning</span>.<span class="ident">clone</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">critical</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">Metric</span><span class="op">&gt;</span>::<span class="ident">Output</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">critical</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">Metric</span><span class="op">&gt;</span>::<span class="ident">Output</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">critical</span>.<span class="ident">clone</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">min</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">Metric</span><span class="op">&gt;</span>::<span class="ident">Output</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">min</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">Metric</span><span class="op">&gt;</span>::<span class="ident">Output</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">min</span>.<span class="ident">clone</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">max</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">Metric</span><span class="op">&gt;</span>::<span class="ident">Output</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">max</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">Metric</span><span class="op">&gt;</span>::<span class="ident">Output</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">max</span>.<span class="ident">clone</span>()
     }
 }
@@ -1230,6 +1265,13 @@
             <span class="kw-2">&amp;</span><span class="ident">resource</span>.<span class="ident">to_nagios_string</span>(),
             <span class="string">&quot;OK: A test description | test=12;14;;0 other=true&quot;</span>
         );
+    }
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">test_resource_with_name</span>() {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">resource</span> <span class="op">=</span> <span class="ident">Resource</span>::<span class="ident">new</span>(<span class="prelude-val">Some</span>(<span class="ident">State</span>::<span class="prelude-val">Ok</span>), <span class="prelude-val">None</span>);
+        <span class="ident">resource</span>.<span class="ident">set_name</span>(<span class="string">&quot;foo&quot;</span>);
+        <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="kw-2">&amp;</span><span class="ident">resource</span>.<span class="ident">to_nagios_string</span>(), <span class="string">&quot;foo OK&quot;</span>)
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
