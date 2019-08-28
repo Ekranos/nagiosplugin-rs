@@ -1,23 +1,15 @@
 var themes = document.getElementById("theme-choices");
 var themePicker = document.getElementById("theme-picker");
 
-function showThemeButtonState() {
-    themes.style.display = "block";
-    themePicker.style.borderBottomRightRadius = "0";
-    themePicker.style.borderBottomLeftRadius = "0";
-}
-
-function hideThemeButtonState() {
-    themes.style.display = "none";
-    themePicker.style.borderBottomRightRadius = "3px";
-    themePicker.style.borderBottomLeftRadius = "3px";
-}
-
 function switchThemeButtonState() {
     if (themes.style.display === "block") {
-        hideThemeButtonState();
+        themes.style.display = "none";
+        themePicker.style.borderBottomRightRadius = "3px";
+        themePicker.style.borderBottomLeftRadius = "3px";
     } else {
-        showThemeButtonState();
+        themes.style.display = "block";
+        themePicker.style.borderBottomRightRadius = "0";
+        themePicker.style.borderBottomLeftRadius = "0";
     }
 };
 
@@ -30,7 +22,7 @@ function handleThemeButtonsBlur(e) {
         (!related ||
          (related.id !== "themePicker" &&
           (!related.parentNode || related.parentNode.id !== "theme-choices")))) {
-        hideThemeButtonState();
+        switchThemeButtonState();
     }
 }
 
@@ -40,7 +32,7 @@ themePicker.onblur = handleThemeButtonsBlur;
     var but = document.createElement('button');
     but.innerHTML = item;
     but.onclick = function(el) {
-        switchTheme(currentTheme, mainTheme, item, true);
+        switchTheme(currentTheme, mainTheme, item);
     };
     but.onblur = handleThemeButtonsBlur;
     themes.appendChild(but);
