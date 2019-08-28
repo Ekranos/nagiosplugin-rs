@@ -33,6 +33,7 @@ pub struct Resource {
     state: Option<State>,
     metrics: Vec<Box<dyn ResourceMetric>>,
     description: Option<String>,
+    name: Option<String>,
 }
 
 impl Resource {
@@ -46,6 +47,7 @@ impl Resource {
             state,
             metrics: Vec::new(),
             description: description.map(|d| d.to_owned()),
+            name: None,
         }
     }
 
@@ -68,22 +70,34 @@ impl Resource {
         self.state = Some(state)
     }
 
+    /// Set the name of this resource. Will be included in the final string output.
+    pub fn set_name(&mut self, name: &str) {
+        self.name = Some(name.to_owned())
+    }
+
     /// Returns a string which nagios understands to determine the service state.
     ///
     /// This function will automatically determine which service state is appropriate based on the
     /// included metrics. If state has been set manually it will always use the manually set state.
     pub fn to_nagios_string(&self) -> String {
         let mut s = String::new();
+
+        if let Some(ref name) = self.name {
+            s.push_str(&format!("{} ", name))
+        }
+
         s.push_str(&self.get_state().to_string());
 
         if let Some(ref description) = self.description {
             s.push_str(&format!(": {}", description));
         }
 
-        s.push_str(" |");
+        if self.metrics.len() > 0 {
+            s.push_str(" |");
 
-        for metric in self.metrics.iter() {
-            s.push_str(&format!(" {}", metric.perf_string()));
+            for metric in self.metrics.iter() {
+                s.push_str(&format!(" {}", metric.perf_string()));
+            }
         }
 
         s
@@ -606,6 +620,13 @@ mod tests {
             &resource.to_nagios_string(),
             "OK: A test description | test=12;14;;0 other=true"
         );
+    }
+
+    #[test]
+    fn test_resource_with_name() {
+        let mut resource = Resource::new(Some(State::Ok), None);
+        resource.set_name("foo");
+        assert_eq!(&resource.to_nagios_string(), "foo OK")
     }
 
     #[test]
