@@ -250,8 +250,16 @@ where
     T: Metric<Output = O>,
 {
     fn to_perf_string(&self) -> String {
+        // must be quoted if contains spaces
+        let name = if self.name().contains(' ') {
+            format!("'{}'", self.name())
+        }
+        else {
+            self.name().to_string()
+        };
+
         metric_string!(
-            self.name(),
+            name,
             self.value(),
             self.warning(),
             self.critical(),
