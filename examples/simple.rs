@@ -5,7 +5,6 @@ use nagiosplugin::{Resource, State};
 // Usage: cargo run --example simple -- haaa
 //        cargo run --example simple -- itsfine
 
-
 fn main() {
     // Grab the first argument
     let arg = args().nth(1).expect("provide an argument");
@@ -18,12 +17,12 @@ fn main() {
         "itsfine" => {
             resource.set_state(State::Ok);
             resource.set_description("Eveything is fine :-)");
-        },
+        }
         "haaa" => {
             resource.set_state(State::Critical);
             resource.set_description("Something went terribly wrong!");
-        },
-        _ => (),  // unexpected argument: the state will remain unknown
+        }
+        _ => (), // unexpected argument: the state will remain unknown
     };
 
     // print the status based on `state` and `description`
