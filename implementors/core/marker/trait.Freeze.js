@@ -6,4 +6,5 @@ implementors["nagiosplugin"] = [{text:"impl Freeze for <a class=\"struct\" href=
             } else {
                 window.pending_implementors = implementors;
             }
-        })()
+        
+})()
