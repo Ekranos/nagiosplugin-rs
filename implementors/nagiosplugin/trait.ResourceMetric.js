@@ -6,5 +6,4 @@ implementors["nagiosplugin"] = [];
             } else {
                 window.pending_implementors = implementors;
             }
-        
-})()
+        })()
