@@ -250,12 +250,17 @@ where
     T: Metric<Output = O>,
 {
     fn to_perf_string(&self) -> String {
-        // must be quoted if contains spaces
-        let name = if self.name().contains(' ') {
+        // replace `=`
+        let name = self.name().replace('=', "_");
+
+        // quote `'`
+        let name = name.replace('\'', "''");
+
+        // quote if contains spaces
+        let name = if name.contains(' ') {
             format!("'{}'", self.name())
-        }
-        else {
-            self.name().to_string()
+        } else {
+            name.to_string()
         };
 
         metric_string!(
@@ -628,6 +633,19 @@ mod tests {
             &resource.to_nagios_string(),
             "OK: A test description | test=12;14;;0 other=true"
         );
+
+        let test_data = [
+            ("test", "OK | test=0"),
+            ("test=a", "OK | test_a=0"),
+            ("te'st", "OK | te''st=0"),
+            ("te st", "OK | 'te st'=0"),
+        ];
+        for (label, expected_string) in &test_data {
+            let metric = SimpleMetric::new(label, Some(State::Ok), 0, None, None, None, None);
+            let resource: Resource = resource![metric];
+
+            assert_eq!(&resource.to_nagios_string(), expected_string,);
+        }
     }
 
     #[test]
