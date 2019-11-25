@@ -265,7 +265,12 @@ where
 
         metric_string!(
             name,
-            self.value(),
+            format!(
+                "{}{}",
+                self.value().to_perf_string(),
+                self.unit_of_measurement().to_string()
+            ),
+            //            self.value(),
             self.warning(),
             self.critical(),
             self.min(),
@@ -286,6 +291,39 @@ where
     }
 }
 
+#[derive(Clone)]
+pub enum Unit {
+    None,
+    Seconds,
+    Milliseconds,
+    Microseconds,
+    Percentage,
+    Bytes,
+    KiloBytes,
+    MegaBytes,
+    TeraBytes,
+    Counter,
+    Other(String),
+}
+
+impl ToString for Unit {
+    fn to_string(&self) -> String {
+        match self {
+            &Unit::None => "".to_owned(),
+            &Unit::Seconds => "s".to_owned(),
+            &Unit::Milliseconds => "ms".to_owned(),
+            &Unit::Microseconds => "us".to_owned(),
+            &Unit::Percentage => "%".to_owned(),
+            &Unit::Bytes => "B".to_owned(),
+            &Unit::KiloBytes => "KB".to_owned(),
+            &Unit::MegaBytes => "MB".to_owned(),
+            &Unit::TeraBytes => "TB".to_owned(),
+            &Unit::Counter => "c".to_owned(),
+            &Unit::Other(ref str) => str.to_owned(),
+        }
+    }
+}
+
 /// This trait can be implemented for any kind of metric and will be used to generate the final
 /// string output for nagios. Calls to the functions should return immediately and not query the
 /// service every time.
@@ -299,6 +337,7 @@ pub trait Metric {
     fn critical(&self) -> Option<Self::Output>;
     fn min(&self) -> Option<Self::Output>;
     fn max(&self) -> Option<Self::Output>;
+    fn unit_of_measurement(&self) -> &Unit;
 }
 
 /// A PartialOrdMetric is a metric which will automatically calculate the State
@@ -327,6 +366,7 @@ where
     min: Option<T>,
     max: Option<T>,
     lower_is_critical: bool,
+    unit_of_measurement: Unit,
 }
 
 impl<T> PartialOrdMetric<T>
@@ -374,7 +414,12 @@ where
             min: min.map(|m| m.clone()),
             max: max.map(|m| m.clone()),
             lower_is_critical,
+            unit_of_measurement: Unit::None,
         }
+    }
+
+    pub fn set_unit_of_measurement(&mut self, unit_of_measurement: Unit) {
+        self.unit_of_measurement = unit_of_measurement
     }
 }
 
@@ -435,6 +480,10 @@ where
     fn max(&self) -> Option<<Self as Metric>::Output> {
         self.max.clone()
     }
+
+    fn unit_of_measurement(&self) -> &Unit {
+        &self.unit_of_measurement
+    }
 }
 
 /// Represents a simple metric where no logic is performed. You give some values in and the same
@@ -451,6 +500,7 @@ where
     critical: Option<T>,
     min: Option<T>,
     max: Option<T>,
+    unit_of_measurement: Unit,
 }
 
 impl<T> SimpleMetric<T>
@@ -474,7 +524,12 @@ where
             critical,
             min,
             max,
+            unit_of_measurement: Unit::None,
         }
+    }
+
+    pub fn set_unit_of_measurement(&mut self, unit_of_measurement: Unit) {
+        self.unit_of_measurement = unit_of_measurement
     }
 }
 
@@ -511,11 +566,15 @@ where
     fn max(&self) -> Option<<Self as Metric>::Output> {
         self.max.clone()
     }
+
+    fn unit_of_measurement(&self) -> &Unit {
+        &self.unit_of_measurement
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Metric, PartialOrdMetric, Resource, SimpleMetric, State};
+    use crate::{Metric, PartialOrdMetric, Resource, SimpleMetric, State, ToPerfString, Unit};
 
     #[test]
     fn test_partial_ord_metric() {
@@ -602,6 +661,16 @@ mod tests {
         assert_eq!(metric.value(), "test");
         assert_eq!(metric.warning(), None);
         assert_eq!(metric.critical(), None);
+    }
+
+    #[test]
+    fn test_simple_metric_unit_of_measurement() {
+        let mut metric = SimpleMetric::new("foo", None, 12, None, None, None, None);
+        metric.set_unit_of_measurement(Unit::Microseconds);
+        assert_eq!(&metric.to_perf_string(), "foo=12us");
+
+        metric.set_unit_of_measurement(Unit::Other("bar".to_owned()));
+        assert_eq!(&metric.to_perf_string(), "foo=12bar");
     }
 
     #[test]
