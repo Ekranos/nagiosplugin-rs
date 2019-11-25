@@ -38,7 +38,7 @@ themePicker.onclick = switchThemeButtonState;
 themePicker.onblur = handleThemeButtonsBlur;
 ["dark","light"].forEach(function(item) {
     var but = document.createElement('button');
-    but.textContent = item;
+    but.innerHTML = item;
     but.onclick = function(el) {
         switchTheme(currentTheme, mainTheme, item, true);
     };
