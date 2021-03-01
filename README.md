@@ -1,7 +1,5 @@
 # nagiosplugin-rs
 
-[![Build Status](https://travis-ci.org/Ekranos/nagiosplugin-rs.svg?branch=master)](https://travis-ci.org/Ekranos/nagiosplugin-rs)
-
 A small helper library to make it easy to write nagios/icinga checks.
 
 [Documentation](https://docs.rs/nagiosplugin/latest)
