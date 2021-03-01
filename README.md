@@ -4,7 +4,7 @@
 
 A small helper library to make it easy to write nagios/icinga checks.
 
-[Documentation](https://ekranos.github.io/nagiosplugin-rs/nagiosplugin/)
+[Documentation](https://docs.rs/nagiosplugin/latest)
 
 ## Suggestions / Contributions?
 
