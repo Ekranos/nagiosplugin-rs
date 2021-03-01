@@ -1,8 +1,8 @@
 [package]
 name = "nagiosplugin"
-version = "0.1.6"
+version = "0.1.7"
 authors = ["Marvin Lee Fimmel <kontakt@ekranos.me>"]
-documentation = "https://ekranos.github.io/nagiosplugin-rs/nagiosplugin/"
+documentation = "https://docs.rs/nagiosplugin/latest/nagiosplugin/"
 license = "MIT/Apache-2.0"
 readme = "README.md"
 keywords = ["nagios", "icinga", "icinga2"]
