@@ -17,7 +17,7 @@ fn main() {
 
     // create a metric
     let metric = SimpleMetric::new(
-        &"size of thing", // label
+        "size of thing", // label
         Some(State::Ok),  // state
         arg,              // current value
         None,             // warn

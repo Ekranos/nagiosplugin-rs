@@ -9,6 +9,7 @@ mod macros;
 mod helper;
 
 pub use crate::helper::{safe_run, safe_run_with_state};
+use std::fmt::Debug;
 
 /// A Resource basically represents a single service if you view it from the perspective of nagios.
 /// If you init it without a state it will determine one from the given metrics.
@@ -30,6 +31,7 @@ pub use crate::helper::{safe_run, safe_run_with_state};
 /// resource.print_and_exit();
 /// # }
 /// ```
+#[derive(Debug)]
 pub struct Resource {
     state: Option<State>,
     checkables: Vec<Box<dyn Checkable>>,
@@ -181,7 +183,7 @@ impl Default for Resource {
 
 /// Represents a single metric of a resource. You shouldn't need to implement this by yourself
 /// since the crate provided types already implement this.
-pub trait ResourceMetric {
+pub trait ResourceMetric: Debug {
     fn perf_string(&self) -> String;
     fn name(&self) -> &str;
     fn state(&self) -> Option<State>;
@@ -190,7 +192,7 @@ pub trait ResourceMetric {
 impl<T, O> ResourceMetric for T
 where
     O: ToPerfString,
-    T: Metric<Output = O> + ToPerfString,
+    T: Metric<Output = O> + ToPerfString + Debug,
 {
     fn perf_string(&self) -> String {
         self.to_perf_string()
@@ -253,7 +255,7 @@ impl PartialOrd for State {
 /// The checkable trait represents anything that has some relevance as a checkable entity in icinga.
 /// Most notably `Metric`s. There are also `StaticCheckable`s which do not contain any metrics but influence the
 /// service state and output of the plugin.
-pub trait Checkable {
+pub trait Checkable : Debug {
     fn name(&self) -> &str;
     fn description(&self) -> Option<&str>;
     fn state(&self) -> Option<State>;
@@ -284,7 +286,7 @@ impl<T: ResourceMetric> Checkable for T {
 ///
 /// ```rust
 /// # use nagiosplugin::*;
-/// let checkable = StaticCheckable::new("test", State::Critical, Some("endpoint down"));
+/// let checkable = StaticCheckable::new("test", State::Critical).with_description("endpoint down");
 /// let resource = resource![checkable];
 /// assert!(resource.to_nagios_string().contains("'test' is CRITICAL: endpoint down"));
 #[derive(Debug, Clone)]
@@ -295,12 +297,17 @@ pub struct StaticCheckable {
 }
 
 impl StaticCheckable {
-    pub fn new(name: &str, state: State, description: Option<&str>) -> Self {
+    pub fn new(name: impl Into<String>, state: State) -> Self {
         Self {
-            name: name.to_string(),
-            description: description.map(|s| s.to_string()),
+            name: name.into(),
+            description: None,
             state,
         }
+    }
+
+    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
     }
 }
 
@@ -391,7 +398,7 @@ where
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum Unit {
     None,
     Seconds,
@@ -455,6 +462,7 @@ pub trait Metric {
 /// assert_eq!(metric.state(), Some(State::Warning));
 /// assert_eq!(metric.value(), 15);
 /// ```
+#[derive(Debug)]
 pub struct PartialOrdMetric<T>
 where
     T: PartialOrd + ToPerfString + Clone,
@@ -477,7 +485,7 @@ where
     ///
     /// *In debug builds this will panic if you pass incorrect values for warning and critical.*
     pub fn new(
-        name: &str,
+        name: impl Into<String>,
         value: T,
         warning: Option<T>,
         critical: Option<T>,
@@ -507,7 +515,7 @@ where
         }
 
         PartialOrdMetric {
-            name: name.to_owned(),
+            name: name.into(),
             value: value.clone(),
             warning: warning.map(|w| w.clone()),
             critical: critical.map(|c| c.clone()),
@@ -588,7 +596,7 @@ where
 
 /// Represents a simple metric where no logic is performed. You give some values in and the same
 /// get out.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct SimpleMetric<T>
 where
     T: ToPerfString + Clone,
@@ -608,7 +616,7 @@ where
     T: ToPerfString + Clone,
 {
     pub fn new(
-        name: &str,
+        name: impl Into<String>,
         state: Option<State>,
         value: T,
         warning: Option<T>,
@@ -617,7 +625,7 @@ where
         max: Option<T>,
     ) -> Self {
         SimpleMetric {
-            name: name.to_owned(),
+            name: name.into(),
             state,
             value,
             warning,
@@ -813,7 +821,7 @@ mod tests {
             ("te st", "OK | 'te st'=0"),
         ];
         for (label, expected_string) in &test_data {
-            let metric = SimpleMetric::new(label, Some(State::Ok), 0, None, None, None, None);
+            let metric = SimpleMetric::new(*label, Some(State::Ok), 0, None, None, None, None);
             let resource: Resource = resource![metric];
 
             assert_eq!(&resource.to_nagios_string(), expected_string,);
@@ -842,9 +850,9 @@ mod tests {
 
     #[test]
     fn test_static_checkable_in_resource() {
-        let c1 = StaticCheckable::new("c1", State::Ok, Some("should be hidden"));
-        let c2 = StaticCheckable::new("c2", State::Critical, Some("c2 error"));
-        let c3 = StaticCheckable::new("c3", State::Critical, None);
+        let c1 = StaticCheckable::new("c1", State::Ok).with_description("should be hidden");
+        let c2 = StaticCheckable::new("c2", State::Critical).with_description("c2 error");
+        let c3 = StaticCheckable::new("c3", State::Critical);
 
         let resource = resource![c1, c2, c3];
         let nagios_string = resource.to_nagios_string();
