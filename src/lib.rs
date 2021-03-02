@@ -295,7 +295,7 @@ pub struct StaticCheckable {
 }
 
 impl StaticCheckable {
-    pub fn new<S: ToString>(name: S, state: State, description: Option<S>) -> Self {
+    pub fn new(name: &str, state: State, description: Option<&str>) -> Self {
         Self {
             name: name.to_string(),
             description: description.map(|s| s.to_string()),
