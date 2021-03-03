@@ -10,6 +10,7 @@ mod helper;
 
 pub use crate::helper::{safe_run, safe_run_with_state};
 use std::fmt::Debug;
+use std::rc::Rc;
 
 /// A Resource basically represents a single service if you view it from the perspective of nagios.
 /// If you init it without a state it will determine one from the given metrics.
@@ -31,10 +32,10 @@ use std::fmt::Debug;
 /// resource.print_and_exit();
 /// # }
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Resource {
     state: Option<State>,
-    checkables: Vec<Box<dyn Checkable>>,
+    checkables: Vec<Rc<dyn Checkable>>,
     description: Option<String>,
     name: Option<String>,
 }
@@ -59,11 +60,11 @@ impl Resource {
     where
         M: 'static + Checkable,
     {
-        self.checkables.push(Box::new(metric))
+        self.checkables.push(Rc::new(metric))
     }
 
     /// Returns a slice of the pushed checkables.
-    pub fn checkables(&self) -> &[Box<dyn Checkable>] {
+    pub fn checkables(&self) -> &[Rc<dyn Checkable>] {
         &self.checkables
     }
 
