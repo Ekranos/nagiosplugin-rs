@@ -38,6 +38,7 @@ pub struct Resource {
     checkables: Vec<Rc<dyn Checkable>>,
     description: Option<String>,
     name: Option<String>,
+    default_state: State,
 }
 
 impl Resource {
@@ -52,7 +53,12 @@ impl Resource {
             checkables: Vec::new(),
             description: description.map(|d| d.to_owned()),
             name: None,
+            default_state: State::Unknown,
         }
+    }
+
+    pub fn set_default_state(&mut self, state: State) {
+        self.default_state = state;
     }
 
     /// Pushes a single ResourceMetric into the resource.
@@ -139,7 +145,7 @@ impl Resource {
     /// In case a state is manually set for this resource,
     /// it will return the manually set state instead.
     pub fn get_state(&self) -> State {
-        let mut state = State::Unknown;
+        let mut state = self.default_state;
         if let Some(ref st) = self.state {
             state = st.clone()
         } else {
