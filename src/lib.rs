@@ -8,7 +8,7 @@ mod macros;
 
 mod helper;
 
-pub use crate::helper::{safe_run, safe_run_with_state};
+pub use crate::helper::{safe_run, safe_run_with_state, safe_run_sync, safe_run_with_state_sync};
 use std::fmt::Debug;
 use std::rc::Rc;
 
