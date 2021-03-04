@@ -15,7 +15,7 @@ where
 
 /// Runs the given closure and exits with a State::Critical after printing out
 /// the error message if the Result contains an Err.
-pub async fn safe_run_sync<F>(f: F)
+pub fn safe_run_sync<F>(f: F)
     where
         F: FnOnce() -> Result<(), Box<dyn Error>>,
 {
