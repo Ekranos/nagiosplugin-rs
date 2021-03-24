@@ -1,6 +1,6 @@
 [package]
 name = "nagiosplugin"
-version = "0.2.8"
+version = "0.2.9"
 authors = ["Marvin Lee Fimmel <kontakt@ekranos.me>"]
 documentation = "https://docs.rs/nagiosplugin/latest"
 license = "MIT/Apache-2.0"
@@ -11,3 +11,4 @@ description = "A small helper library to make it easy to write nagios/icinga che
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0.39"
