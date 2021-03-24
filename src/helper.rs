@@ -19,7 +19,7 @@ where
     F: Future<Output = Result<(), anyhow::Error>>,
 {
     if let Err(e) = future.await {
-        println!("{}: {}", error_state.to_string(), e);
+        println!("{}: {:?}", error_state.to_string(), e);
         exit(error_state.exit_code());
     }
 }
@@ -40,7 +40,7 @@ where
     F: FnOnce() -> Result<(), anyhow::Error>,
 {
     if let Err(e) = f() {
-        println!("{}: {}", error_state.to_string(), e);
+        println!("{}: {:?}", error_state.to_string(), e);
         exit(error_state.exit_code());
     }
 }
