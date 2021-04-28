@@ -1,874 +1,550 @@
-//! The nagiosplugin crate provides some basic utilities to make it easier to write nagios checks.
-
+/// This crate provides utilities to write Icinga/Nagios checks/plugins.
+/// If you want to use this library only for compatible output take a look at the [Resource].
+/// If you also want error handling, take a look at the [Runner].
 use std::cmp::Ordering;
-use std::process;
+use std::fmt;
+use std::fmt::Formatter;
 
-#[macro_use]
-mod macros;
+pub use runner::*;
 
-mod helper;
+use crate::ServiceState::{Critical, Warning};
 
-pub use crate::helper::{safe_run, safe_run_with_state, safe_run_sync, safe_run_with_state_sync};
-use std::fmt::Debug;
-use std::rc::Rc;
+mod runner;
 
-/// A Resource basically represents a single service if you view it from the perspective of nagios.
-/// If you init it without a state it will determine one from the given metrics.
-///
-/// You can also create a Resource filled with metrics via the *resource!* macro, which is much
-/// like the *vec!* macro.
-///
-/// ```rust
-/// # #[macro_use]
-/// # extern crate nagiosplugin;
-/// # use nagiosplugin::{SimpleMetric, State};
-/// # fn main() {
-/// let m1 = SimpleMetric::new("test", Some(State::Ok), 12, None, None, None, None);
-/// let m2 = SimpleMetric::new("other", None, true, None, None, None, None);
-/// let resource = resource![m1, m2];
-/// assert_eq!(&resource.to_nagios_string(), "OK | test=12 other=true");
-///
-/// // Prints "OK | test=12 other=true" and exits with an exit code of 0 in this case
-/// resource.print_and_exit();
-/// # }
-/// ```
-#[derive(Debug, Clone)]
-pub struct Resource {
-    state: Option<State>,
-    checkables: Vec<Rc<dyn Checkable>>,
-    description: Option<String>,
-    name: Option<String>,
-    default_state: State,
-}
-
-impl Resource {
-    /// If state is set to Some(State) then it will always use this instead of determining it from
-    /// the given metrics.
-    ///
-    /// If you want to create a Resource from some metrics with automatic determination of the
-    /// state you can use the *resource!* macro.
-    pub fn new(state: Option<State>, description: Option<&str>) -> Resource {
-        Resource {
-            state,
-            checkables: Vec::new(),
-            description: description.map(|d| d.to_owned()),
-            name: None,
-            default_state: State::Unknown,
-        }
-    }
-
-    pub fn set_default_state(&mut self, state: State) {
-        self.default_state = state;
-    }
-
-    /// Pushes a single ResourceMetric into the resource.
-    pub fn push<M>(&mut self, metric: M)
-    where
-        M: 'static + Checkable,
-    {
-        self.checkables.push(Rc::new(metric))
-    }
-
-    /// Returns a slice of the pushed checkables.
-    pub fn checkables(&self) -> &[Rc<dyn Checkable>] {
-        &self.checkables
-    }
-
-    /// Manually set the state for this resource. This disabled the automatic state determination
-    /// based on the included metrics of this resource.
-    pub fn set_state(&mut self, state: State) {
-        self.state = Some(state)
-    }
-
-    /// Set the name of this resource. Will be included in the final string output.
-    pub fn set_name(&mut self, name: &str) {
-        self.name = Some(name.to_owned())
-    }
-
-    /// Returns a string which nagios understands to determine the service state.
-    ///
-    /// This function will automatically determine which service state is appropriate based on the
-    /// included metrics. If state has been set manually it will always use the manually set state.
-    pub fn to_nagios_string(&self) -> String {
-        let mut s = String::new();
-
-        if let Some(ref name) = self.name {
-            s.push_str(&format!("{} ", name))
-        }
-
-        s.push_str(&self.get_state().to_string());
-
-        if let Some(ref description) = self.description {
-            s.push_str(&format!(": {}", description));
-        }
-
-        for checkable in self.checkables.iter() {
-            let state = checkable.state();
-            let description = checkable.description();
-            if let (Some(state), Some(description)) = (state, description) {
-                if state != State::Ok {
-                    s.push_str(&format!(
-                        "\n'{}' is {}: {}",
-                        checkable.name(),
-                        state.to_string(),
-                        description
-                    ));
-                }
-            } else if let Some(state) = state {
-                if state != State::Ok {
-                    s.push_str(&format!(
-                        "\n'{}' is {}",
-                        checkable.name(),
-                        state.to_string()
-                    ));
-                }
-            } else if let Some(description) = description {
-                s.push_str(&format!("\n'{}': {}", checkable.name(), description));
-            }
-        }
-
-        if self.checkables.len() > 0 {
-            s.push_str(" |");
-
-            for checkable in self.checkables.iter() {
-                if let Some(perf_string) = checkable.perf_string() {
-                    s.push_str(&format!(" {}", perf_string));
-                }
-            }
-        }
-
-        s
-    }
-
-    /// Will determine a State by the given metrics.
-    ///
-    /// In case a state is manually set for this resource,
-    /// it will return the manually set state instead.
-    pub fn get_state(&self) -> State {
-        let mut state = self.default_state;
-        if let Some(ref st) = self.state {
-            state = st.clone()
-        } else {
-            for metric in self.checkables.iter() {
-                if let Some(st) = metric.state() {
-                    if state < st {
-                        state = st;
-                    }
-                }
-            }
-        }
-        state
-    }
-
-    /// Get the description of this resource.
-    pub fn get_description(&self) -> Option<&String> {
-        self.description.as_ref()
-    }
-
-    /// Set the description of this resource.
-    pub fn set_description(&mut self, description: &str) {
-        self.description = Some(description.to_owned());
-    }
-
-    /// Will return the exit code of the determined state via Self::state.
-    pub fn exit_code(&self) -> i32 {
-        self.get_state().exit_code()
-    }
-
-    /// Will print Self::to_nagios_string and exit with the exit code from Self::exit_code
-    pub fn print_and_exit(&self) {
-        println!("{}", self.to_nagios_string());
-        process::exit(self.exit_code());
-    }
-}
-
-impl Default for Resource {
-    fn default() -> Self {
-        Resource::new(None, None)
-    }
-}
-
-/// Represents a single metric of a resource. You shouldn't need to implement this by yourself
-/// since the crate provided types already implement this.
-pub trait ResourceMetric: Debug {
-    fn perf_string(&self) -> String;
-    fn name(&self) -> &str;
-    fn state(&self) -> Option<State>;
-}
-
-impl<T, O> ResourceMetric for T
-where
-    O: ToPerfString,
-    T: Metric<Output = O> + ToPerfString + Debug,
-{
-    fn perf_string(&self) -> String {
-        self.to_perf_string()
-    }
-
-    fn name(&self) -> &str {
-        self.name()
-    }
-
-    fn state(&self) -> Option<State> {
-        self.state()
-    }
-}
-
-/// Represents a service state from nagios.
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum State {
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum ServiceState {
     Ok,
     Warning,
     Critical,
     Unknown,
 }
 
-impl State {
-    /// Returns the corresponding nagios exit code to signal the service state of self.
+impl ServiceState {
+    /// Returns the corresponding exit code for this state.
     pub fn exit_code(&self) -> i32 {
         match self {
-            &State::Ok => 0,
-            &State::Warning => 1,
-            &State::Critical => 2,
-            &State::Unknown => 3,
+            ServiceState::Ok => 0,
+            ServiceState::Warning => 1,
+            ServiceState::Critical => 2,
+            ServiceState::Unknown => 3,
         }
     }
-}
 
-impl ToString for State {
-    fn to_string(&self) -> String {
+    fn order_number(&self) -> u8 {
         match self {
-            State::Ok => "OK".to_owned(),
-            State::Warning => "WARNING".to_owned(),
-            State::Critical => "CRITICAL".to_owned(),
-            State::Unknown => "UNKNOWN".to_owned(),
+            ServiceState::Ok => 0,
+            ServiceState::Unknown => 1,
+            ServiceState::Warning => 2,
+            ServiceState::Critical => 3,
         }
     }
 }
 
-impl PartialOrd for State {
-    fn partial_cmp(&self, other: &State) -> Option<Ordering> {
-        let f = |state| match state {
-            &State::Unknown => 0,
-            &State::Ok => 1,
-            &State::Warning => 2,
-            &State::Critical => 3,
+impl PartialOrd for ServiceState {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.order_number().partial_cmp(&other.order_number())
+    }
+}
+
+impl fmt::Display for ServiceState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            ServiceState::Ok => "OK",
+            ServiceState::Warning => "WARNING",
+            ServiceState::Critical => "CRITICAL",
+            ServiceState::Unknown => "UNKNOWN",
         };
 
-        f(self).partial_cmp(&f(other))
+        f.write_str(s)
     }
 }
 
-/// The checkable trait represents anything that has some relevance as a checkable entity in icinga.
-/// Most notably `Metric`s. There are also `StaticCheckable`s which do not contain any metrics but influence the
-/// service state and output of the plugin.
-pub trait Checkable : Debug {
-    fn name(&self) -> &str;
-    fn description(&self) -> Option<&str>;
-    fn state(&self) -> Option<State>;
-    fn perf_string(&self) -> Option<String>;
+/// Defines if a metric triggers if value is greater or less than the thresholds.
+#[derive(Debug, Copy, Clone)]
+pub enum TriggerIfValue {
+    Greater,
+    Less,
 }
 
-impl<T: ResourceMetric> Checkable for T {
-    fn name(&self) -> &str {
-        ResourceMetric::name(self)
-    }
-
-    fn description(&self) -> Option<&str> {
-        None
-    }
-
-    fn state(&self) -> Option<State> {
-        ResourceMetric::state(self)
-    }
-
-    fn perf_string(&self) -> Option<String> {
-        Some(ResourceMetric::perf_string(self))
+impl From<&TriggerIfValue> for Ordering {
+    fn from(v: &TriggerIfValue) -> Self {
+        match v {
+            TriggerIfValue::Greater => Ordering::Greater,
+            TriggerIfValue::Less => Ordering::Less,
+        }
     }
 }
 
-/// Use a `StaticCheckable` for things you want to check but which do not contain a metric.
-///
-/// Example: You check if an endpoint answers
-///
-/// ```rust
-/// # use nagiosplugin::*;
-/// let checkable = StaticCheckable::new("test", State::Critical).with_description("endpoint down");
-/// let resource = resource![checkable];
-/// assert!(resource.to_nagios_string().contains("'test' is CRITICAL: endpoint down"));
+/// Defines a metric with a required name and value. Also takes optional thresholds (warning, critical)
+/// minimum, maximum. Can also be set to ignore thresholds and have a fixed [ServiceState].
 #[derive(Debug, Clone)]
-pub struct StaticCheckable {
+pub struct Metric<T> {
     name: String,
-    description: Option<String>,
-    state: State,
+    value: T,
+    thresholds: Option<(T, T, TriggerIfValue)>,
+    min: Option<T>,
+    max: Option<T>,
+    fixed_state: Option<ServiceState>,
 }
 
-impl StaticCheckable {
-    pub fn new(name: impl Into<String>, state: State) -> Self {
+impl<T> Metric<T> {
+    pub fn new(name: impl Into<String>, value: T) -> Self {
         Self {
             name: name.into(),
-            description: None,
-            state,
+            value,
+            thresholds: Default::default(),
+            min: Default::default(),
+            max: Default::default(),
+            fixed_state: Default::default(),
         }
     }
 
-    pub fn with_description(mut self, description: impl Into<String>) -> Self {
-        self.description = Some(description.into());
+    pub fn with_thresholds(
+        mut self,
+        warning: T,
+        critical: T,
+        trigger_if_value: TriggerIfValue,
+    ) -> Self {
+        self.thresholds = Some((warning, critical, trigger_if_value));
+        self
+    }
+
+    pub fn with_minimum(mut self, minimum: T) -> Self {
+        self.min = Some(minimum);
+        self
+    }
+
+    pub fn with_maximum(mut self, maximum: T) -> Self {
+        self.max = Some(maximum);
+        self
+    }
+
+    /// If a fixed state is set, this metric will always report the given state if turned in to a
+    /// [CheckResult].
+    pub fn with_fixed_state(mut self, state: ServiceState) -> Self {
+        self.fixed_state = Some(state);
         self
     }
 }
 
-impl Checkable for StaticCheckable {
-    fn name(&self) -> &str {
-        &self.name
+/// Represents a single performance metric.
+pub struct PerfData<T> {
+    name: String,
+    value: T,
+    warning: Option<T>,
+    critical: Option<T>,
+    minimum: Option<T>,
+    maximum: Option<T>,
+}
+
+impl<T: ToPerfString> PerfData<T> {
+    pub fn new(name: impl Into<String>, value: T) -> Self {
+        Self {
+            name: name.into(),
+            value,
+            warning: Default::default(),
+            critical: Default::default(),
+            minimum: Default::default(),
+            maximum: Default::default(),
+        }
     }
 
-    fn description(&self) -> Option<&str> {
-        self.description.as_ref().map(|s| s.as_str())
+    pub fn with_thresholds(mut self, warning: T, critical: T) -> Self {
+        self.warning = Some(warning);
+        self.critical = Some(critical);
+        self
     }
 
-    fn state(&self) -> Option<State> {
-        Some(self.state)
+    pub fn with_minimum(mut self, minimum: T) -> Self {
+        self.minimum = Some(minimum);
+        self
     }
 
-    fn perf_string(&self) -> Option<String> {
-        None
+    pub fn with_maximum(mut self, maximum: T) -> Self {
+        self.maximum = Some(maximum);
+        self
     }
 }
 
-/// The purpose of ToPerfString is only so one can define custom representations of custom types
-/// without using the ToString trait so we don't interfere with that.
-///
-/// Also used internally for generation of the final output.
-///
-/// It's already implemented for some basic types.
+impl<T: ToPerfString> From<PerfData<T>> for PerfString {
+    fn from(perf_data: PerfData<T>) -> Self {
+        let s = PerfString::new(
+            &perf_data.name,
+            &perf_data.value,
+            perf_data.warning.as_ref(),
+            perf_data.critical.as_ref(),
+            perf_data.minimum.as_ref(),
+            perf_data.maximum.as_ref(),
+        );
+        s
+    }
+}
+
+/// Newtype wrapper around a string to "ensure" only valid conversions happen.
+/// If you want to create
+pub struct PerfString(String);
+
+impl PerfString {
+    pub fn new<T>(
+        name: &str,
+        value: &T,
+        warning: Option<&T>,
+        critical: Option<&T>,
+        minimum: Option<&T>,
+        maximum: Option<&T>,
+    ) -> Self
+    where
+        T: ToPerfString,
+    {
+        let value = value.to_perf_string();
+        let warning = warning.map_or_else(|| "".to_owned(), |v| v.to_perf_string());
+        let critical = critical.map_or_else(|| "".to_owned(), |v| v.to_perf_string());
+        let minimum = minimum.map_or_else(|| "".to_owned(), |v| v.to_perf_string());
+        let maximum = maximum.map_or_else(|| "".to_owned(), |v| v.to_perf_string());
+        PerfString(format!(
+            "'{}'={};{};{};{};{}",
+            name, value, warning, critical, minimum, maximum
+        ))
+    }
+}
+
+/// Represents a single item of a check. Multiple of these are used to form a [Resource].
+pub struct CheckResult {
+    state: Option<ServiceState>,
+    message: Option<String>,
+    perf_string: Option<PerfString>,
+}
+
+impl CheckResult {
+    pub fn new() -> Self {
+        Self {
+            state: Default::default(),
+            message: Default::default(),
+            perf_string: Default::default(),
+        }
+    }
+
+    pub fn with_state(mut self, state: ServiceState) -> Self {
+        self.state = Some(state);
+        self
+    }
+
+    pub fn with_message(mut self, message: impl Into<String>) -> Self {
+        self.message = Some(message.into());
+        self
+    }
+
+    pub fn with_perf_data(mut self, perf_data: impl Into<PerfString>) -> Self {
+        self.perf_string = Some(perf_data.into());
+        self
+    }
+}
+
+impl Default for CheckResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T: PartialOrd + ToPerfString> From<Metric<T>> for CheckResult {
+    fn from(metric: Metric<T>) -> Self {
+        let state = if let Some((warning, critical, trigger)) = &metric.thresholds {
+            let ord: Ordering = trigger.into();
+            let warning_cmp = metric.value.partial_cmp(warning);
+            let critical_cmp = metric.value.partial_cmp(critical);
+
+            [(critical_cmp, Critical), (warning_cmp, Warning)]
+                .iter()
+                .filter_map(|(cmp, state)| {
+                    if let Some(cmp) = cmp {
+                        Some((cmp, state))
+                    } else {
+                        None
+                    }
+                })
+                .filter_map(|(&cmp, &state)| {
+                    if cmp == ord || cmp == Ordering::Equal {
+                        Some(state)
+                    } else {
+                        None
+                    }
+                })
+                .next()
+        } else {
+            None
+        }
+        .or(Some(ServiceState::Ok));
+
+        let message = match state {
+            Some(state) if state != ServiceState::Ok => {
+                let (warning, critical, _) = metric.thresholds.as_ref().unwrap();
+                let threshold = match state {
+                    ServiceState::Warning => warning,
+                    ServiceState::Critical => critical,
+                    _ => unreachable!(),
+                };
+                Some(format!(
+                    "metric '{}' is {}: value '{}' has exceeded threshold of '{}'",
+                    &metric.name,
+                    state,
+                    metric.value.to_perf_string(),
+                    threshold.to_perf_string(),
+                ))
+            }
+            _ => None,
+        };
+
+        let perf_string = {
+            let (warning, critical) = if let Some((warning, critical, _)) = &metric.thresholds {
+                (Some(warning), Some(critical))
+            } else {
+                (None, None)
+            };
+
+            PerfString::new(
+                &metric.name,
+                &metric.value,
+                warning,
+                critical,
+                metric.min.as_ref(),
+                metric.max.as_ref(),
+            )
+        };
+
+        CheckResult {
+            state,
+            message,
+            perf_string: Some(perf_string),
+        }
+    }
+}
+
+/// Implement this if you have a value which can be converted to a performance metric value.
 pub trait ToPerfString {
     fn to_perf_string(&self) -> String;
 }
 
-impl_to_perf_string_on_to_string!(bool, usize);
-impl_to_perf_string_on_to_string!(u8, u16, u32, u64, u128);
-impl_to_perf_string_on_to_string!(i8, i16, i32, i64, i128);
-impl_to_perf_string_on_to_string!(f32, f64);
-impl_to_perf_string_on_to_string!(String);
-
-impl<'a> ToPerfString for &'a str {
-    fn to_perf_string(&self) -> String {
-        self.to_string()
-    }
+macro_rules! impl_to_perf_string {
+    ($t:ty) => {
+        impl ToPerfString for $t {
+            fn to_perf_string(&self) -> String {
+                self.to_string()
+            }
+        }
+    };
 }
 
-impl<T, O> ToPerfString for T
-where
-    O: ToPerfString,
-    T: Metric<Output = O>,
-{
-    fn to_perf_string(&self) -> String {
-        // replace `=`
-        let name = self.name().replace('=', "_");
+impl_to_perf_string!(usize);
+impl_to_perf_string!(isize);
+impl_to_perf_string!(u8);
+impl_to_perf_string!(u16);
+impl_to_perf_string!(u32);
+impl_to_perf_string!(u64);
+impl_to_perf_string!(u128);
+impl_to_perf_string!(i8);
+impl_to_perf_string!(i16);
+impl_to_perf_string!(i32);
+impl_to_perf_string!(i64);
+impl_to_perf_string!(i128);
+impl_to_perf_string!(f32);
+impl_to_perf_string!(f64);
 
-        // quote `'`
-        let name = name.replace('\'', "''");
+/// Represents a single service / resource from the perspective of Icinga.
+pub struct Resource {
+    name: String,
+    results: Vec<CheckResult>,
+    fixed_state: Option<ServiceState>,
+    description: Option<String>,
+}
 
-        // quote if contains spaces
-        let name = if name.contains(' ') {
-            format!("'{}'", self.name())
-        } else {
-            name.to_string()
+impl Resource {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            results: Default::default(),
+            fixed_state: Default::default(),
+            description: Default::default(),
+        }
+    }
+
+    pub fn with_fixed_state(mut self, state: ServiceState) -> Self {
+        self.fixed_state = Some(state);
+        self
+    }
+
+    pub fn with_result(mut self, result: impl Into<CheckResult>) -> Self {
+        self.push_result(result);
+        self
+    }
+
+    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+        self.set_description(description);
+        self
+    }
+
+    pub fn set_description(&mut self, description: impl Into<String>) {
+        self.description = Some(description.into());
+    }
+
+    pub fn push_result(&mut self, result: impl Into<CheckResult>) {
+        self.results.push(result.into());
+    }
+
+    pub fn nagios_result(self) -> (ServiceState, String) {
+        let (state, messages, perf_string) = {
+            let mut final_state = ServiceState::Ok;
+
+            let mut messages = String::new();
+            let mut perf_string = String::new();
+
+            for result in self.results {
+                if let Some(state) = result.state {
+                    if final_state < state {
+                        final_state = state;
+                    }
+                }
+
+                if let Some(message) = result.message {
+                    messages.push_str(message.trim());
+                    messages.push('\n');
+                }
+
+                if let Some(s) = result.perf_string {
+                    perf_string.push(' ');
+                    perf_string.push_str(s.0.trim());
+                }
+            }
+
+            if let Some(state) = self.fixed_state {
+                final_state = state;
+            }
+
+            (final_state, messages, perf_string)
         };
 
-        metric_string!(
-            name,
-            format!(
-                "{}{}",
-                self.value().to_perf_string(),
-                self.unit_of_measurement().to_string()
-            ),
-            //            self.value(),
-            self.warning(),
-            self.critical(),
-            self.min(),
-            self.max()
+        let description = {
+            let mut s = String::new();
+            s.push_str(&self.name);
+            s.push_str(" is ");
+            s.push_str(&state.to_string());
+
+            if let Some(description) = self.description {
+                s.push_str(": ");
+                s.push_str(description.trim());
+            }
+            s
+        };
+
+        let pad = if messages.is_empty() { "" } else { "\n\n" };
+
+        (
+            state,
+            format!("{}{}{}|{}", description, pad, messages.trim(), perf_string),
         )
     }
-}
 
-impl<T> ToPerfString for Option<T>
-where
-    T: ToPerfString,
-{
-    fn to_perf_string(&self) -> String {
-        match self {
-            Some(ref s) => s.to_perf_string(),
-            None => String::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Unit {
-    None,
-    Seconds,
-    Milliseconds,
-    Microseconds,
-    Percentage,
-    Bytes,
-    KiloBytes,
-    MegaBytes,
-    TeraBytes,
-    Counter,
-    Other(String),
-}
-
-impl ToString for Unit {
-    fn to_string(&self) -> String {
-        match self {
-            &Unit::None => "".to_owned(),
-            &Unit::Seconds => "s".to_owned(),
-            &Unit::Milliseconds => "ms".to_owned(),
-            &Unit::Microseconds => "us".to_owned(),
-            &Unit::Percentage => "%".to_owned(),
-            &Unit::Bytes => "B".to_owned(),
-            &Unit::KiloBytes => "KB".to_owned(),
-            &Unit::MegaBytes => "MB".to_owned(),
-            &Unit::TeraBytes => "TB".to_owned(),
-            &Unit::Counter => "c".to_owned(),
-            &Unit::Other(ref str) => str.to_owned(),
-        }
-    }
-}
-
-/// This trait can be implemented for any kind of metric and will be used to generate the final
-/// string output for nagios. Calls to the functions should return immediately and not query the
-/// service every time.
-pub trait Metric {
-    type Output: ToPerfString;
-
-    fn name(&self) -> &str;
-    fn state(&self) -> Option<State>;
-    fn value(&self) -> Self::Output;
-    fn warning(&self) -> Option<Self::Output>;
-    fn critical(&self) -> Option<Self::Output>;
-    fn min(&self) -> Option<Self::Output>;
-    fn max(&self) -> Option<Self::Output>;
-    fn unit_of_measurement(&self) -> &Unit;
-}
-
-/// A PartialOrdMetric is a metric which will automatically calculate the State
-/// based on the given value and warning and/or critical value.
-///
-/// It doesn't matter if you provide warning or critical or both of none of these. Even though
-/// you should choose SimpleMetric if you aren't providing any warning or critical value.
-///
-/// The state function of the implemented Metric trait will always be one of: Ok, Warning, Critical
-///
-/// ```rust
-/// # extern crate nagiosplugin;
-/// # use nagiosplugin::{Metric, State, PartialOrdMetric};
-/// let metric = PartialOrdMetric::new("test", 15, Some(15), Some(30), None, None, false);
-/// assert_eq!(metric.state(), Some(State::Warning));
-/// assert_eq!(metric.value(), 15);
-/// ```
-#[derive(Debug)]
-pub struct PartialOrdMetric<T>
-where
-    T: PartialOrd + ToPerfString + Clone,
-{
-    name: String,
-    value: T,
-    warning: Option<T>,
-    critical: Option<T>,
-    min: Option<T>,
-    max: Option<T>,
-    lower_is_critical: bool,
-    unit_of_measurement: Unit,
-}
-
-impl<T> PartialOrdMetric<T>
-where
-    T: PartialOrd + ToPerfString + Clone,
-{
-    /// Creates a new PartialOrdMetric from the given values.
-    ///
-    /// *In debug builds this will panic if you pass incorrect values for warning and critical.*
-    pub fn new(
-        name: impl Into<String>,
-        value: T,
-        warning: Option<T>,
-        critical: Option<T>,
-        min: Option<T>,
-        max: Option<T>,
-        lower_is_critical: bool,
-    ) -> Self {
-        #[cfg(debug_assertions)]
-        {
-            if warning.is_some() && critical.is_some() {
-                let warning = warning.clone().unwrap();
-                let critical = critical.clone().unwrap();
-
-                if lower_is_critical && warning < critical {
-                    panic!("lower_is_critical is set to true while warning is lower than critical, this is not correct");
-                } else if !lower_is_critical && warning > critical {
-                    panic!("lower_is_critical is set to false while warning is lower than critical, this is not correct");
-                }
-            }
-
-            if min.is_some() && max.is_some() {
-                let min = min.clone().unwrap();
-                let max = max.clone().unwrap();
-
-                assert!(min < max, "minimum value is not smaller than maximum value")
-            }
-        }
-
-        PartialOrdMetric {
-            name: name.into(),
-            value: value.clone(),
-            warning: warning.map(|w| w.clone()),
-            critical: critical.map(|c| c.clone()),
-            min: min.map(|m| m.clone()),
-            max: max.map(|m| m.clone()),
-            lower_is_critical,
-            unit_of_measurement: Unit::None,
-        }
-    }
-
-    pub fn set_unit_of_measurement(&mut self, unit_of_measurement: Unit) {
-        self.unit_of_measurement = unit_of_measurement
-    }
-}
-
-impl<T> Metric for PartialOrdMetric<T>
-where
-    T: PartialOrd + ToPerfString + Clone,
-{
-    type Output = T;
-
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn state(&self) -> Option<State> {
-        if let Some(ref critical) = self.critical {
-            if self.lower_is_critical {
-                if &self.value <= critical {
-                    return Some(State::Critical);
-                }
-            } else {
-                if &self.value >= critical {
-                    return Some(State::Critical);
-                }
-            }
-        }
-
-        if let Some(ref warning) = self.warning {
-            if self.lower_is_critical {
-                if &self.value <= warning {
-                    return Some(State::Warning);
-                }
-            } else {
-                if &self.value >= warning {
-                    return Some(State::Warning);
-                }
-            }
-        }
-
-        Some(State::Ok)
-    }
-
-    fn value(&self) -> <Self as Metric>::Output {
-        self.value.clone()
-    }
-
-    fn warning(&self) -> Option<<Self as Metric>::Output> {
-        self.warning.clone()
-    }
-
-    fn critical(&self) -> Option<<Self as Metric>::Output> {
-        self.critical.clone()
-    }
-
-    fn min(&self) -> Option<<Self as Metric>::Output> {
-        self.min.clone()
-    }
-
-    fn max(&self) -> Option<<Self as Metric>::Output> {
-        self.max.clone()
-    }
-
-    fn unit_of_measurement(&self) -> &Unit {
-        &self.unit_of_measurement
-    }
-}
-
-/// Represents a simple metric where no logic is performed. You give some values in and the same
-/// get out.
-#[derive(Debug, Clone)]
-pub struct SimpleMetric<T>
-where
-    T: ToPerfString + Clone,
-{
-    name: String,
-    state: Option<State>,
-    value: T,
-    warning: Option<T>,
-    critical: Option<T>,
-    min: Option<T>,
-    max: Option<T>,
-    unit_of_measurement: Unit,
-}
-
-impl<T> SimpleMetric<T>
-where
-    T: ToPerfString + Clone,
-{
-    pub fn new(
-        name: impl Into<String>,
-        state: Option<State>,
-        value: T,
-        warning: Option<T>,
-        critical: Option<T>,
-        min: Option<T>,
-        max: Option<T>,
-    ) -> Self {
-        SimpleMetric {
-            name: name.into(),
-            state,
-            value,
-            warning,
-            critical,
-            min,
-            max,
-            unit_of_measurement: Unit::None,
-        }
-    }
-
-    pub fn set_unit_of_measurement(&mut self, unit_of_measurement: Unit) {
-        self.unit_of_measurement = unit_of_measurement
-    }
-}
-
-impl<T> Metric for SimpleMetric<T>
-where
-    T: ToPerfString + Clone,
-{
-    type Output = T;
-
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn state(&self) -> Option<State> {
-        self.state.clone()
-    }
-
-    fn value(&self) -> <Self as Metric>::Output {
-        self.value.clone()
-    }
-
-    fn warning(&self) -> Option<<Self as Metric>::Output> {
-        self.warning.clone()
-    }
-
-    fn critical(&self) -> Option<<Self as Metric>::Output> {
-        self.critical.clone()
-    }
-
-    fn min(&self) -> Option<<Self as Metric>::Output> {
-        self.min.clone()
-    }
-
-    fn max(&self) -> Option<<Self as Metric>::Output> {
-        self.max.clone()
-    }
-
-    fn unit_of_measurement(&self) -> &Unit {
-        &self.unit_of_measurement
+    fn print_and_exit(self) -> ! {
+        let (state, s) = self.nagios_result();
+        println!("{}", &s);
+        std::process::exit(state.exit_code());
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        Metric, PartialOrdMetric, Resource, SimpleMetric, State, StaticCheckable, ToPerfString,
-        Unit,
-    };
+    use super::*;
 
     #[test]
-    fn test_partial_ord_metric() {
-        let metric = PartialOrdMetric::new("test", 12, None, None, None, None, false);
-        assert_eq!(metric.name(), "test");
-        assert_eq!(metric.state(), Some(State::Ok));
-        assert_eq!(metric.value(), 12);
-        assert_eq!(metric.warning(), None);
-        assert_eq!(metric.critical(), None);
+    fn test_resource_nagios_result() {
+        let (state, s) = Resource::new("foo")
+            .with_description("i am bar")
+            .with_result(
+                CheckResult::new()
+                    .with_state(ServiceState::Warning)
+                    .with_message("flubblebar"),
+            )
+            .with_result(CheckResult::new().with_state(ServiceState::Critical))
+            .nagios_result();
 
-        // Cases with lower_is_critical = false
-
-        let metric = PartialOrdMetric::new("test", 12, Some(15), Some(30), None, None, false);
-        assert_eq!(metric.state(), Some(State::Ok));
-        assert_eq!(metric.value(), 12);
-        assert_eq!(metric.warning(), Some(15));
-        assert_eq!(metric.critical(), Some(30));
-
-        let metric = PartialOrdMetric::new("test", 15, Some(15), Some(30), None, None, false);
-        assert_eq!(metric.state(), Some(State::Warning));
-        assert_eq!(metric.value(), 15);
-
-        let metric = PartialOrdMetric::new("test", 18, Some(15), Some(30), None, None, false);
-        assert_eq!(metric.state(), Some(State::Warning));
-        assert_eq!(metric.value(), 18);
-
-        let metric = PartialOrdMetric::new("test", 30, Some(15), Some(30), None, None, false);
-        assert_eq!(metric.state(), Some(State::Critical));
-        assert_eq!(metric.value(), 30);
-
-        let metric = PartialOrdMetric::new("test", 35, Some(15), Some(30), None, None, false);
-        assert_eq!(metric.state(), Some(State::Critical));
-        assert_eq!(metric.value(), 35);
-
-        // Cases with lower_is_critical = true
-
-        let metric = PartialOrdMetric::new("test", 35, Some(30), Some(15), None, None, true);
-        assert_eq!(metric.state(), Some(State::Ok));
-        assert_eq!(metric.value(), 35);
-        assert_eq!(metric.warning(), Some(30));
-        assert_eq!(metric.critical(), Some(15));
-
-        let metric = PartialOrdMetric::new("test", 30, Some(30), Some(15), None, None, true);
-        assert_eq!(metric.state(), Some(State::Warning));
-        assert_eq!(metric.value(), 30);
-
-        let metric = PartialOrdMetric::new("test", 20, Some(30), Some(15), None, None, true);
-        assert_eq!(metric.state(), Some(State::Warning));
-        assert_eq!(metric.value(), 20);
-
-        let metric = PartialOrdMetric::new("test", 15, Some(30), Some(15), None, None, true);
-        assert_eq!(metric.state(), Some(State::Critical));
-        assert_eq!(metric.value(), 15);
-
-        let metric = PartialOrdMetric::new("test", 10, Some(30), Some(15), None, None, true);
-        assert_eq!(metric.state(), Some(State::Critical));
-        assert_eq!(metric.value(), 10);
+        assert_eq!(state, ServiceState::Critical);
+        assert!(s.contains("i am bar"));
+        assert!(s.contains("flubblebar"));
+        assert!(s.contains(&ServiceState::Critical.to_string()));
     }
 
     #[test]
-    fn test_simple_metric() {
-        let metric = SimpleMetric::new("test", Some(State::Ok), 12, None, None, None, None);
-        assert_eq!(metric.state(), Some(State::Ok));
-        assert_eq!(metric.value(), 12);
-        assert_eq!(metric.warning(), None);
-        assert_eq!(metric.critical(), None);
-
-        let metric = SimpleMetric::new(
-            "test",
-            Some(State::Unknown),
-            22,
-            Some(15),
-            Some(30),
-            None,
-            None,
-        );
-        assert_eq!(metric.state(), Some(State::Unknown));
-        assert_eq!(metric.value(), 22);
-        assert_eq!(metric.warning(), Some(15));
-        assert_eq!(metric.critical(), Some(30));
-
-        let metric = SimpleMetric::new("test", Some(State::Ok), "test", None, None, None, None);
-        assert_eq!(metric.state(), Some(State::Ok));
-        assert_eq!(metric.value(), "test");
-        assert_eq!(metric.warning(), None);
-        assert_eq!(metric.critical(), None);
+    fn test_resource_with_fixed_state() {
+        let (state, _) = Resource::new("foo")
+            .with_fixed_state(ServiceState::Critical)
+            .nagios_result();
+        assert_eq!(state, ServiceState::Critical);
     }
 
     #[test]
-    fn test_simple_metric_unit_of_measurement() {
-        let mut metric = SimpleMetric::new("foo", None, 12, None, None, None, None);
-        metric.set_unit_of_measurement(Unit::Microseconds);
-        assert_eq!(&metric.to_perf_string(), "foo=12us");
+    fn test_resource_with_ok_result() {
+        let (state, msg) = Resource::new("foo")
+            .with_result(
+                CheckResult::new()
+                    .with_message("test")
+                    .with_state(ServiceState::Ok),
+            )
+            .nagios_result();
 
-        metric.set_unit_of_measurement(Unit::Other("bar".to_owned()));
-        assert_eq!(&metric.to_perf_string(), "foo=12bar");
+        assert_eq!(ServiceState::Ok, state);
+        assert!(msg.contains("test"));
+    }
+
+    // #[test]
+    // fn test_resource_empty() {
+    //     let (state, msg) =
+    // }
+
+    #[test]
+    fn test_perf_string_new() {
+        let s = PerfString::new("foo", &12, Some(&42), None, None, Some(&60));
+        assert_eq!(&s.0, "'foo'=12;42;;;60")
     }
 
     #[test]
-    fn test_resource() {
-        let m1 = SimpleMetric::new("test", Some(State::Ok), 12, None, None, None, None);
-        let m2 = SimpleMetric::new("other", None, true, None, None, None, None);
+    fn test_metric_into_check_result_complete() {
+        let metric = Metric::new("test", 42)
+            .with_minimum(0)
+            .with_maximum(100)
+            .with_thresholds(40, 50, TriggerIfValue::Greater);
 
-        let resource = resource![m1, m2];
+        let result: CheckResult = metric.into();
+        assert_eq!(result.state, Some(ServiceState::Warning));
 
-        assert_eq!(&resource.to_nagios_string(), "OK | test=12 other=true");
-
-        let m1 = SimpleMetric::new("test", Some(State::Ok), 12, Some(14), None, Some(0), None);
-        let m2 = SimpleMetric::new("other", None, true, None, None, None, None);
-
-        let resource = resource![m1, m2];
-
-        assert_eq!(
-            &resource.to_nagios_string(),
-            "OK | test=12;14;;0 other=true"
-        );
-
-        let m1 = SimpleMetric::new("test", Some(State::Ok), 12, Some(14), None, Some(0), None);
-        let m2 = SimpleMetric::new("other", None, true, None, None, None, None);
-
-        let mut resource: Resource = resource![m1, m2];
-        resource.set_description("A test description");
-
-        assert_eq!(
-            &resource.to_nagios_string(),
-            "OK: A test description | test=12;14;;0 other=true"
-        );
-
-        let test_data = [
-            ("test", "OK | test=0"),
-            ("test=a", "OK | test_a=0"),
-            ("te'st", "OK | te''st=0"),
-            ("te st", "OK | 'te st'=0"),
-        ];
-        for (label, expected_string) in &test_data {
-            let metric = SimpleMetric::new(*label, Some(State::Ok), 0, None, None, None, None);
-            let resource: Resource = resource![metric];
-
-            assert_eq!(&resource.to_nagios_string(), expected_string,);
-        }
+        let message = result.message.expect("no message set");
+        assert!(message.contains(&ServiceState::Warning.to_string()));
+        assert!(message.contains("test"));
+        assert!(message.contains("threshold"));
     }
 
     #[test]
-    fn test_resource_with_name() {
-        let mut resource = Resource::new(Some(State::Ok), None);
-        resource.set_name("foo");
-        assert_eq!(&resource.to_nagios_string(), "foo OK")
+    fn test_metric_into_check_result_threshold_less() {
+        let result: CheckResult = Metric::new("test", 40)
+            .with_thresholds(50, 30, TriggerIfValue::Less)
+            .into();
+
+        assert_eq!(result.state, Some(ServiceState::Warning));
     }
 
     #[test]
-    fn test_state() {
-        assert_eq!(State::Ok.exit_code(), 0);
-        assert_eq!(State::Warning.exit_code(), 1);
-        assert_eq!(State::Critical.exit_code(), 2);
-        assert_eq!(State::Unknown.exit_code(), 3);
+    fn test_metric_into_check_result_threshold_greater() {
+        let result: CheckResult = Metric::new("test", 40)
+            .with_thresholds(30, 50, TriggerIfValue::Greater)
+            .into();
 
-        assert_eq!(&State::Ok.to_string(), "OK");
-        assert_eq!(&State::Warning.to_string(), "WARNING");
-        assert_eq!(&State::Critical.to_string(), "CRITICAL");
-        assert_eq!(&State::Unknown.to_string(), "UNKNOWN");
+        assert_eq!(result.state, Some(ServiceState::Warning));
     }
 
     #[test]
-    fn test_static_checkable_in_resource() {
-        let c1 = StaticCheckable::new("c1", State::Ok).with_description("should be hidden");
-        let c2 = StaticCheckable::new("c2", State::Critical).with_description("c2 error");
-        let c3 = StaticCheckable::new("c3", State::Critical);
+    fn test_metric_into_check_result_threshold_equal_to_val() {
+        let result: CheckResult = Metric::new("foo", 30)
+            .with_thresholds(30, 40, TriggerIfValue::Greater)
+            .into();
 
-        let resource = resource![c1, c2, c3];
-        let nagios_string = resource.to_nagios_string();
-
-        assert!(!nagios_string.contains("c1"));
-        assert!(!nagios_string.contains("should be hidden"));
-        assert!(nagios_string.contains("c2"));
-        assert!(nagios_string.contains("c2 error"));
-        assert!(nagios_string.contains("'c2' is CRITICAL"));
-        assert!(nagios_string.contains("'c3' is CRITICAL"));
+        assert_eq!(result.state, Some(Warning));
     }
 }

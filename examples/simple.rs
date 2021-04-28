@@ -1,31 +1,17 @@
-use std::env::args;
+use std::error::Error;
 
-use nagiosplugin::{Resource, State};
-
-// Usage: cargo run --example simple -- haaa
-//        cargo run --example simple -- itsfine
+use nagiosplugin::{Metric, Resource, Runner, TriggerIfValue};
 
 fn main() {
-    // Grab the first argument
-    let arg = args().nth(1).expect("provide an argument");
+    Runner::new().safe_run(do_check).print_and_exit()
+}
 
-    // Create a default resource: state is unknown, description is empty
-    let mut resource = Resource::new(None, None);
+fn do_check() -> Result<Resource, Box<dyn Error>> {
+    // The first metric will not issue an alarm, the second one will.
+    let resource = Resource::new("foo")
+        .with_description("This is a simple test plugin")
+        .with_result(Metric::new("test", 15).with_thresholds(20, 50, TriggerIfValue::Greater))
+        .with_result(Metric::new("alerting", 42).with_thresholds(40, 50, TriggerIfValue::Greater));
 
-    // Check logic goes here
-    match arg.as_ref() {
-        "itsfine" => {
-            resource.set_state(State::Ok);
-            resource.set_description("Eveything is fine :-)");
-        }
-        "haaa" => {
-            resource.set_state(State::Critical);
-            resource.set_description("Something went terribly wrong!");
-        }
-        _ => (), // unexpected argument: the state will remain unknown
-    };
-
-    // print the status based on `state` and `description`
-    // then exists with appropriate exit code
-    resource.print_and_exit();
+    Ok(resource)
 }
