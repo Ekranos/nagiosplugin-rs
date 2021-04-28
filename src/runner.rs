@@ -3,6 +3,7 @@ use std::fmt::Debug;
 use crate::{Resource, ServiceState};
 
 pub struct Runner<E> {
+    #[allow(clippy::type_complexity)]
     on_error: Option<Box<dyn FnOnce(&E) -> (ServiceState, E)>>,
 }
 
@@ -30,6 +31,12 @@ impl<E: Debug> Runner<E> {
                 RunnerResult::Err(state, msg)
             }
         }
+    }
+}
+
+impl<E: Debug> Default for Runner<E> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
