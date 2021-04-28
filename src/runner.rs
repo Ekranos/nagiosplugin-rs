@@ -17,7 +17,7 @@ impl<E: Debug> Runner<E> {
     }
 
     /// This will run either the default `on_error` handler or the one specified by calling
-    /// [on_error]. It will use the given ([ServiceState], message) tuple and exit with these.
+    /// [Self::on_error]. It will use the given ([ServiceState], message) tuple and exit with these.
     pub fn safe_run(self, f: impl FnOnce() -> Result<Resource, E>) -> RunnerResult<E> {
         match f() {
             Ok(resource) => RunnerResult::Ok(resource),
