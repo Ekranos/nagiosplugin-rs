@@ -1,6 +1,6 @@
 [package]
 name = "nagiosplugin"
-version = "0.4.1-dev"
+version = "0.4.1"
 authors = ["Marvin Lee Fimmel <kontakt@ekranos.me>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
@@ -12,6 +12,7 @@ description = "A small helper library to make it easy to write nagios/icinga che
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+thiserror = "1.0.24"
 
 [dev-dependencies]
 anyhow = "1.0.40"

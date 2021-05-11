@@ -8,6 +8,7 @@ use std::fmt::Formatter;
 pub use runner::*;
 
 use crate::ServiceState::{Critical, Warning};
+use std::str::FromStr;
 
 mod runner;
 
@@ -56,6 +57,24 @@ impl fmt::Display for ServiceState {
         };
 
         f.write_str(s)
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("expected one of: ok, warning, critical, unknown")]
+pub struct ServiceStateFromStrError;
+
+impl FromStr for ServiceState {
+    type Err = ServiceStateFromStrError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "ok" => Ok(ServiceState::Ok),
+            "warning" => Ok(ServiceState::Warning),
+            "critical" => Ok(ServiceState::Critical),
+            "unknown" => Ok(ServiceState::Unknown),
+            _ => Err(ServiceStateFromStrError),
+        }
     }
 }
 
