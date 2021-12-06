@@ -9,7 +9,7 @@ A small helper library to make it easy to write nagios/icinga checks.
 Add the library to your `Cargo.toml`.
 
     [dependencies]
-    nagiosplugin = "0.4"
+    nagiosplugin = "0.5"
 
 Currently the documentation is really scarce. Please take a look at the `examples`
 directory.
