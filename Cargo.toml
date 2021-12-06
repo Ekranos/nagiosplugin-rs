@@ -1,6 +1,6 @@
 [package]
 name = "nagiosplugin"
-version = "0.4.2-dev"
+version = "0.5.0"
 authors = ["Marvin Lee Fimmel <kontakt@ekranos.me>"]
 edition = "2018"
 license = "MIT/Apache-2.0"

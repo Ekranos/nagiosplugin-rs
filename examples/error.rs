@@ -9,7 +9,5 @@ fn main() {
 // This example uses anyhow
 fn do_check() -> Result<Resource, anyhow::Error> {
     // Do something which returns an error.
-    Err(anyhow!("something really bad happened"))?;
-
-    Ok(Resource::new("this will never get returned"))
+    return Err(anyhow!("something really bad happened"));
 }

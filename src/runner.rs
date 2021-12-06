@@ -4,7 +4,7 @@ use crate::{Resource, ServiceState};
 
 pub struct Runner<E> {
     #[allow(clippy::type_complexity)]
-    on_error: Option<Box<dyn FnOnce(&E) -> (ServiceState, E)>>,
+    on_error: Option<Box<dyn FnOnce(E) -> (ServiceState, E)>>,
 }
 
 impl<E: Debug> Runner<E> {
@@ -12,7 +12,7 @@ impl<E: Debug> Runner<E> {
         Self { on_error: None }
     }
 
-    pub fn on_error(mut self, f: impl FnOnce(&E) -> (ServiceState, E) + 'static) -> Self {
+    pub fn on_error(mut self, f: impl FnOnce(E) -> (ServiceState, E) + 'static) -> Self {
         self.on_error = Some(Box::new(f));
         self
     }
@@ -23,10 +23,10 @@ impl<E: Debug> Runner<E> {
         match f() {
             Ok(resource) => RunnerResult::Ok(resource),
             Err(err) => {
-                let (state, msg) = self
-                    .on_error
-                    .map(|f| f(&err))
-                    .unwrap_or_else(|| (ServiceState::Critical, err));
+                let (state, msg) = match self.on_error {
+                    None => (ServiceState::Critical, err),
+                    Some(f) => f(err),
+                };
 
                 RunnerResult::Err(state, msg)
             }
