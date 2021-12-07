@@ -100,7 +100,7 @@ impl From<&TriggerIfValue> for Ordering {
 pub struct Metric<T> {
     name: String,
     value: T,
-    thresholds: Option<(T, T, TriggerIfValue)>,
+    thresholds: Option<(Option<T>, Option<T>, TriggerIfValue)>,
     min: Option<T>,
     max: Option<T>,
     fixed_state: Option<ServiceState>,
@@ -120,11 +120,11 @@ impl<T> Metric<T> {
 
     pub fn with_thresholds(
         mut self,
-        warning: T,
-        critical: T,
+        warning: impl Into<Option<T>>,
+        critical: impl Into<Option<T>>,
         trigger_if_value: TriggerIfValue,
     ) -> Self {
-        self.thresholds = Some((warning, critical, trigger_if_value));
+        self.thresholds = Some((warning.into(), critical.into(), trigger_if_value));
         self
     }
 
@@ -168,9 +168,9 @@ impl<T: ToPerfString> PerfData<T> {
         }
     }
 
-    pub fn with_thresholds(mut self, warning: T, critical: T) -> Self {
-        self.warning = Some(warning);
-        self.critical = Some(critical);
+    pub fn with_thresholds(mut self, warning: Option<T>, critical: Option<T>) -> Self {
+        self.warning = warning;
+        self.critical = critical;
         self
     }
 
@@ -269,8 +269,14 @@ impl<T: PartialOrd + ToPerfString> From<Metric<T>> for CheckResult {
     fn from(metric: Metric<T>) -> Self {
         let state = if let Some((warning, critical, trigger)) = &metric.thresholds {
             let ord: Ordering = trigger.into();
-            let warning_cmp = metric.value.partial_cmp(warning);
-            let critical_cmp = metric.value.partial_cmp(critical);
+            let warning_cmp = warning
+                .as_ref()
+                .map(|w| metric.value.partial_cmp(&w))
+                .flatten();
+            let critical_cmp = critical
+                .as_ref()
+                .map(|w| metric.value.partial_cmp(&w))
+                .flatten();
 
             [(critical_cmp, Critical), (warning_cmp, Warning)]
                 .iter()
@@ -298,8 +304,8 @@ impl<T: PartialOrd + ToPerfString> From<Metric<T>> for CheckResult {
             Some(state) if state != ServiceState::Ok => {
                 let (warning, critical, _) = metric.thresholds.as_ref().unwrap();
                 let threshold = match state {
-                    ServiceState::Warning => warning,
-                    ServiceState::Critical => critical,
+                    ServiceState::Warning => warning.as_ref().unwrap(),
+                    ServiceState::Critical => critical.as_ref().unwrap(),
                     _ => unreachable!(),
                 };
                 Some(format!(
@@ -315,11 +321,10 @@ impl<T: PartialOrd + ToPerfString> From<Metric<T>> for CheckResult {
 
         let perf_string = {
             let (warning, critical) = if let Some((warning, critical, _)) = &metric.thresholds {
-                (Some(warning), Some(critical))
+                (warning.as_ref(), critical.as_ref())
             } else {
                 (None, None)
             };
-
             PerfString::new(
                 &metric.name,
                 &metric.value,
@@ -564,6 +569,21 @@ mod tests {
             .with_thresholds(30, 40, TriggerIfValue::Greater)
             .into();
 
-        assert_eq!(result.state, Some(Warning));
+        assert_eq!(result.state, Some(ServiceState::Warning));
+    }
+
+    #[test]
+    fn test_metric_into_check_result_threshold_only_warning() {
+        let result: CheckResult = Metric::new("foo", 30)
+            .with_thresholds(25, None, TriggerIfValue::Greater)
+            .into();
+
+        assert_eq!(result.state, Some(ServiceState::Warning));
+
+        let result: CheckResult = Metric::new("foo", 30)
+            .with_thresholds(35, None, TriggerIfValue::Greater)
+            .into();
+
+        assert_eq!(result.state, Some(ServiceState::Ok));
     }
 }
