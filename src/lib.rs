@@ -78,6 +78,81 @@ impl FromStr for ServiceState {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum Unit {
+    None,
+    Seconds,
+    Milliseconds,
+    Microseconds,
+    Percentage,
+    Bytes,
+    Kilobytes,
+    Megabytes,
+    Gigabytes,
+    Terabytes,
+    Counter,
+    Other(UnitString),
+}
+
+impl Default for Unit {
+    fn default() -> Self {
+        Unit::None
+    }
+}
+
+impl Unit {
+    fn as_str(&self) -> &str {
+        match self {
+            Unit::None => "",
+            Unit::Seconds => "s",
+            Unit::Milliseconds => "ms",
+            Unit::Microseconds => "us",
+            Unit::Percentage => "%",
+            Unit::Bytes => "B",
+            Unit::Kilobytes => "KB",
+            Unit::Megabytes => "MB",
+            Unit::Gigabytes => "GB",
+            Unit::Terabytes => "TB",
+            Unit::Counter => "c",
+            Unit::Other(s) => &s.0,
+        }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum UnitStringCreateError {
+    // TODO: Maybe even whitespace?
+    #[error("expected string to not include numbers, semicolons or quotes")]
+    InvalidCharacters,
+}
+
+#[derive(Debug, Clone)]
+pub struct UnitString(String);
+
+impl UnitString {
+    pub fn new(s: impl Into<String>) -> Result<Self, UnitStringCreateError> {
+        let s = s.into();
+        if ('0'..='9').chain(['"', ';']).any(|c| s.contains(c)) {
+            Err(UnitStringCreateError::InvalidCharacters)
+        } else {
+            Ok(UnitString::new_unchecked(s))
+        }
+    }
+
+    pub fn new_unchecked(s: impl Into<String>) -> Self {
+        UnitString(s.into())
+    }
+}
+
+impl FromStr for UnitString {
+    type Err = UnitStringCreateError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        UnitString::new(s)
+    }
+}
+
 /// Defines if a metric triggers if value is greater or less than the thresholds.
 #[derive(Debug, Copy, Clone)]
 pub enum TriggerIfValue {
@@ -100,6 +175,7 @@ impl From<&TriggerIfValue> for Ordering {
 pub struct Metric<T> {
     name: String,
     value: T,
+    unit: Unit,
     thresholds: Option<(Option<T>, Option<T>, TriggerIfValue)>,
     min: Option<T>,
     max: Option<T>,
@@ -111,6 +187,7 @@ impl<T> Metric<T> {
         Self {
             name: name.into(),
             value,
+            unit: Default::default(),
             thresholds: Default::default(),
             min: Default::default(),
             max: Default::default(),
@@ -144,12 +221,18 @@ impl<T> Metric<T> {
         self.fixed_state = Some(state);
         self
     }
+
+    pub fn with_unit(mut self, unit: Unit) -> Self {
+        self.unit = unit;
+        self
+    }
 }
 
 /// Represents a single performance metric.
 pub struct PerfData<T> {
     name: String,
     value: T,
+    unit: Unit,
     warning: Option<T>,
     critical: Option<T>,
     minimum: Option<T>,
@@ -161,6 +244,7 @@ impl<T: ToPerfString> PerfData<T> {
         Self {
             name: name.into(),
             value,
+            unit: Default::default(),
             warning: Default::default(),
             critical: Default::default(),
             minimum: Default::default(),
@@ -183,6 +267,11 @@ impl<T: ToPerfString> PerfData<T> {
         self.maximum = Some(maximum);
         self
     }
+
+    pub fn with_unit(mut self, unit: Unit) -> Self {
+        self.unit = unit;
+        self
+    }
 }
 
 impl<T: ToPerfString> From<PerfData<T>> for PerfString {
@@ -190,6 +279,7 @@ impl<T: ToPerfString> From<PerfData<T>> for PerfString {
         let s = PerfString::new(
             &perf_data.name,
             &perf_data.value,
+            perf_data.unit,
             perf_data.warning.as_ref(),
             perf_data.critical.as_ref(),
             perf_data.minimum.as_ref(),
@@ -207,6 +297,7 @@ impl PerfString {
     pub fn new<T>(
         name: &str,
         value: &T,
+        unit: Unit,
         warning: Option<&T>,
         critical: Option<&T>,
         minimum: Option<&T>,
@@ -221,8 +312,14 @@ impl PerfString {
         let minimum = minimum.map_or_else(|| "".to_owned(), |v| v.to_perf_string());
         let maximum = maximum.map_or_else(|| "".to_owned(), |v| v.to_perf_string());
         PerfString(format!(
-            "'{}'={};{};{};{};{}",
-            name, value, warning, critical, minimum, maximum
+            "'{}'={}{};{};{};{};{}",
+            name,
+            value,
+            unit.as_str(),
+            warning,
+            critical,
+            minimum,
+            maximum
         ))
     }
 }
@@ -328,6 +425,7 @@ impl<T: PartialOrd + ToPerfString> From<Metric<T>> for CheckResult {
             PerfString::new(
                 &metric.name,
                 &metric.value,
+                metric.unit,
                 warning,
                 critical,
                 metric.min.as_ref(),
@@ -518,14 +616,9 @@ mod tests {
         assert!(msg.contains("test"));
     }
 
-    // #[test]
-    // fn test_resource_empty() {
-    //     let (state, msg) =
-    // }
-
     #[test]
     fn test_perf_string_new() {
-        let s = PerfString::new("foo", &12, Some(&42), None, None, Some(&60));
+        let s = PerfString::new("foo", &12, Unit::None, Some(&42), None, None, Some(&60));
         assert_eq!(&s.0, "'foo'=12;42;;;60")
     }
 
@@ -583,6 +676,18 @@ mod tests {
         let result: CheckResult = Metric::new("foo", 30)
             .with_thresholds(35, None, TriggerIfValue::Greater)
             .into();
+
+        assert_eq!(result.state, Some(ServiceState::Ok));
+    }
+
+    #[test]
+    fn test_metric_into_check_result_with_unit() {
+        let result: CheckResult = Metric::new("foo", 20)
+            .with_thresholds(25, None, TriggerIfValue::Greater)
+            .with_unit(Unit::Megabytes)
+            .into();
+
+        result.perf_string.unwrap().0.contains("MB");
 
         assert_eq!(result.state, Some(ServiceState::Ok));
     }
