@@ -1,8 +1,12 @@
 # nagiosplugin-rs
 
+![license MIT](https://img.shields.io/badge/LICENSE-MIT-green)
+![license APACHE2.0](https://img.shields.io/badge/LICENSE-APACHE2.0-green)
+![passively maintaned](https://img.shields.io/badge/maintenance-passive-yellow)
+
 A small helper library to make it easy to write nagios/icinga checks.
 
-[Documentation](https://docs.rs/nagiosplugin/latest)
+[![Documentation](https://img.shields.io/badge/Documentation-docs.rs-blue)](https://docs.rs/nagiosplugin)
 
 # How to use
 
