@@ -1,5 +1,6 @@
 # nagiosplugin-rs
 
+![crates.io nagiosplugin](https://img.shields.io/badge/crates.io-nagiosplugin-orange)
 ![license MIT](https://img.shields.io/badge/LICENSE-MIT-green)
 ![license APACHE2.0](https://img.shields.io/badge/LICENSE-APACHE2.0-green)
 ![passively maintaned](https://img.shields.io/badge/maintenance-passive-yellow)
