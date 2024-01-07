@@ -2,6 +2,31 @@ use std::fmt::Debug;
 
 use crate::{Resource, ServiceState};
 
+/// The runner is a helper to run a function that returns a [Result] with a [Resource] and maps the error
+/// case to a [ServiceState] and a message. This is to avoid boilerplate in every plugin.
+///
+/// ## Example
+///
+/// ```no_run
+/// use std::error::Error;
+///
+/// use nagiosplugin::{Metric, Resource, Runner, TriggerIfValue};
+///
+/// fn main() {
+///     Runner::new().safe_run(do_check).print_and_exit()
+/// }
+///
+/// fn do_check() -> Result<Resource, Box<dyn Error>> {
+///    // The first metric will not issue an alarm, the second one will.
+///    let resource = Resource::new("foo")
+///         .with_description("This is a simple test plugin")
+///         .with_result(Metric::new("test", 15).with_thresholds(20, 50, TriggerIfValue::Greater))
+///         .with_result(Metric::new("alerting", 42).with_thresholds(40, 50, TriggerIfValue::Greater));
+///
+///     Ok(resource)
+/// }
+/// ```
+
 pub struct Runner<E> {
     #[allow(clippy::type_complexity)]
     on_error: Option<Box<dyn FnOnce(E) -> (ServiceState, E)>>,
@@ -12,6 +37,7 @@ impl<E: Debug> Runner<E> {
         Self { on_error: None }
     }
 
+    /// This will set a custom error handler. The is mostly useful to provide better plugin output.
     pub fn on_error(mut self, f: impl FnOnce(E) -> (ServiceState, E) + 'static) -> Self {
         self.on_error = Some(Box::new(f));
         self
@@ -40,8 +66,11 @@ impl<E: Debug> Default for Runner<E> {
     }
 }
 
+/// The result of a runner execution.
 pub enum RunnerResult<E> {
+    /// The run was successful and it contains the returned [Resource].
     Ok(Resource),
+    /// The run was not successful and it contains the [ServiceState] and the error.
     Err(ServiceState, E),
 }
 
@@ -70,7 +99,7 @@ mod tests {
         let result = Runner::<EmptyError>::new()
             .on_error(|_| {
                 assert!(false);
-                (ServiceState::Unknown, EmptyError {})
+                (ServiceState::Unknown, EmptyError)
             })
             .safe_run(|| Ok(Resource::new("test")));
 
@@ -80,7 +109,7 @@ mod tests {
     #[test]
     fn test_runner_error() {
         let result = Runner::<EmptyError>::new()
-            .on_error(|_| (ServiceState::Unknown, EmptyError {}))
+            .on_error(|_| (ServiceState::Unknown, EmptyError))
             .safe_run(|| Err(EmptyError {}));
 
         matches!(result, RunnerResult::Err(_, _));

@@ -1,6 +1,6 @@
-/// This crate provides utilities to write Icinga/Nagios checks/plugins.
-/// If you want to use this library only for compatible output take a look at the [Resource].
-/// If you also want error handling, take a look at the [Runner].
+//! This crate provides utilities to write Icinga/Nagios checks/plugins.
+//! If you want to use this library only for compatible output take a look at the [Resource].
+//! If you also want error handling, take a look at the [Runner].
 use std::cmp::Ordering;
 use std::fmt;
 use std::fmt::Formatter;
@@ -13,6 +13,7 @@ use std::str::FromStr;
 mod runner;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+/// Represents the state of a service / resource.
 pub enum ServiceState {
     Ok,
     Warning,
@@ -31,6 +32,8 @@ impl ServiceState {
         }
     }
 
+    /// Returns a number for ordering purposes. Ordering is Ok < Unknown < Warning < Critical.
+    /// So if you order you get the best to worst state.
     fn order_number(&self) -> u8 {
         match self {
             ServiceState::Ok => 0,
@@ -62,6 +65,7 @@ impl fmt::Display for ServiceState {
 
 #[derive(Debug, thiserror::Error)]
 #[error("expected one of: ok, warning, critical, unknown")]
+/// This error is returned by the [FromStr] implementation of [ServiceState].
 pub struct ServiceStateFromStrError;
 
 impl FromStr for ServiceState {
@@ -78,8 +82,11 @@ impl FromStr for ServiceState {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
+/// This represents the unit for a metric. It can be one of the predefined units or a custom one.
+/// See [Nagios Plugin Development Guidelines](https://nagios-plugins.org/doc/guidelines.html#AEN200) for more information.
 pub enum Unit {
+    #[default]
     None,
     Seconds,
     Milliseconds,
@@ -92,12 +99,6 @@ pub enum Unit {
     Terabytes,
     Counter,
     Other(UnitString),
-}
-
-impl Default for Unit {
-    fn default() -> Self {
-        Unit::None
-    }
 }
 
 impl Unit {
@@ -121,6 +122,7 @@ impl Unit {
 
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
+/// This error is returned if a [UnitString] is created with an invalid string.
 pub enum UnitStringCreateError {
     // TODO: Maybe even whitespace?
     #[error("expected string to not include numbers, semicolons or quotes")]
@@ -128,6 +130,7 @@ pub enum UnitStringCreateError {
 }
 
 #[derive(Debug, Clone)]
+/// Newtype wrapper around a string to ensure only valid strings end up in the performance data.
 pub struct UnitString(String);
 
 impl UnitString {
@@ -289,8 +292,8 @@ impl<T: ToPerfString> From<PerfData<T>> for PerfString {
     }
 }
 
-/// Newtype wrapper around a string to "ensure" only valid conversions happen.
-/// If you want to create
+/// Newtype wrapper around a string to ensure only valid strings end up in the final output.
+/// This is used for the performance data / metric part of the output.
 pub struct PerfString(String);
 
 impl PerfString {
@@ -306,6 +309,7 @@ impl PerfString {
     where
         T: ToPerfString,
     {
+        // TODO: Sanitize name
         let value = value.to_perf_string();
         let warning = warning.map_or_else(|| "".to_owned(), |v| v.to_perf_string());
         let critical = critical.map_or_else(|| "".to_owned(), |v| v.to_perf_string());
@@ -332,6 +336,7 @@ pub struct CheckResult {
 }
 
 impl CheckResult {
+    /// Creates an empty instance.
     pub fn new() -> Self {
         Self {
             state: Default::default(),
@@ -350,6 +355,8 @@ impl CheckResult {
         self
     }
 
+    /// Sets the performance data of this result. Takes anything that implements [`Into<PerfString>`].
+    /// This includes [`PerfData`].
     pub fn with_perf_data(mut self, perf_data: impl Into<PerfString>) -> Self {
         self.perf_string = Some(perf_data.into());
         self
@@ -364,26 +371,16 @@ impl Default for CheckResult {
 
 impl<T: PartialOrd + ToPerfString> From<Metric<T>> for CheckResult {
     fn from(metric: Metric<T>) -> Self {
-        let state = if let Some((warning, critical, trigger)) = &metric.thresholds {
+        let state = if let Some(state) = metric.fixed_state {
+            Some(state)
+        } else if let Some((warning, critical, trigger)) = &metric.thresholds {
             let ord: Ordering = trigger.into();
-            let warning_cmp = warning
-                .as_ref()
-                .map(|w| metric.value.partial_cmp(&w))
-                .flatten();
-            let critical_cmp = critical
-                .as_ref()
-                .map(|w| metric.value.partial_cmp(&w))
-                .flatten();
+            let warning_cmp = warning.as_ref().and_then(|w| metric.value.partial_cmp(w));
+            let critical_cmp = critical.as_ref().and_then(|w| metric.value.partial_cmp(w));
 
             [(critical_cmp, Critical), (warning_cmp, Warning)]
                 .iter()
-                .filter_map(|(cmp, state)| {
-                    if let Some(cmp) = cmp {
-                        Some((cmp, state))
-                    } else {
-                        None
-                    }
-                })
+                .filter_map(|(cmp, state)| cmp.as_ref().map(|cmp| (cmp, state)))
                 .filter_map(|(&cmp, &state)| {
                     if cmp == ord || cmp == Ordering::Equal {
                         Some(state)
@@ -394,8 +391,7 @@ impl<T: PartialOrd + ToPerfString> From<Metric<T>> for CheckResult {
                 .next()
         } else {
             None
-        }
-        .or(Some(ServiceState::Ok));
+        };
 
         let message = match state {
             Some(state) if state != ServiceState::Ok => {
@@ -422,6 +418,7 @@ impl<T: PartialOrd + ToPerfString> From<Metric<T>> for CheckResult {
             } else {
                 (None, None)
             };
+
             PerfString::new(
                 &metric.name,
                 &metric.value,
@@ -480,6 +477,7 @@ pub struct Resource {
 }
 
 impl Resource {
+    /// Creates a new instance with the given name.
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -489,6 +487,8 @@ impl Resource {
         }
     }
 
+    /// If a fixed state is set, the coressponding [Resource] will always report the given state regardless of the
+    /// actual state of the [CheckResult]s.
     pub fn with_fixed_state(mut self, state: ServiceState) -> Self {
         self.fixed_state = Some(state);
         self
@@ -512,6 +512,7 @@ impl Resource {
         self.results.push(result.into());
     }
 
+    /// Calculates the state and message of this resource
     pub fn nagios_result(self) -> (ServiceState, String) {
         let (state, messages, perf_string) = {
             let mut final_state = ServiceState::Ok;
@@ -565,6 +566,8 @@ impl Resource {
         )
     }
 
+    /// Calls [Self::nagios_result] and prints the result to stdout. It will also exit with the
+    /// corresponding exit code based on the state.
     fn print_and_exit(self) -> ! {
         let (state, s) = self.nagios_result();
         println!("{}", &s);
@@ -677,7 +680,7 @@ mod tests {
             .with_thresholds(35, None, TriggerIfValue::Greater)
             .into();
 
-        assert_eq!(result.state, Some(ServiceState::Ok));
+        assert_eq!(result.state, None);
     }
 
     #[test]
@@ -689,6 +692,6 @@ mod tests {
 
         result.perf_string.unwrap().0.contains("MB");
 
-        assert_eq!(result.state, Some(ServiceState::Ok));
+        assert_eq!(result.state, None);
     }
 }
