@@ -12,12 +12,13 @@ use std::str::FromStr;
 
 mod runner;
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 /// Represents the state of a service / resource.
 pub enum ServiceState {
     Ok,
     Warning,
     Critical,
+    #[default]
     Unknown,
 }
 
@@ -47,6 +48,12 @@ impl ServiceState {
 impl PartialOrd for ServiceState {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.order_number().partial_cmp(&other.order_number())
+    }
+}
+
+impl Ord for ServiceState {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.order_number().cmp(&other.order_number())
     }
 }
 
@@ -82,7 +89,7 @@ impl FromStr for ServiceState {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
 /// This represents the unit for a metric. It can be one of the predefined units or a custom one.
 /// See [Nagios Plugin Development Guidelines](https://nagios-plugins.org/doc/guidelines.html#AEN200) for more information.
 pub enum Unit {
@@ -129,7 +136,7 @@ pub enum UnitStringCreateError {
     InvalidCharacters,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
 /// Newtype wrapper around a string to ensure only valid strings end up in the performance data.
 pub struct UnitString(String);
 
@@ -157,7 +164,7 @@ impl FromStr for UnitString {
 }
 
 /// Defines if a metric triggers if value is greater or less than the thresholds.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TriggerIfValue {
     Greater,
     Less,
@@ -232,6 +239,7 @@ impl<T> Metric<T> {
 }
 
 /// Represents a single performance metric.
+#[derive(Debug, Clone)]
 pub struct PerfData<T> {
     name: String,
     value: T,
@@ -294,6 +302,7 @@ impl<T: ToPerfString> From<PerfData<T>> for PerfString {
 
 /// Newtype wrapper around a string to ensure only valid strings end up in the final output.
 /// This is used for the performance data / metric part of the output.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PerfString(String);
 
 impl PerfString {
@@ -329,6 +338,7 @@ impl PerfString {
 }
 
 /// Represents a single item of a check. Multiple of these are used to form a [Resource].
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CheckResult {
     state: Option<ServiceState>,
     message: Option<String>,
@@ -469,6 +479,7 @@ impl_to_perf_string!(f32);
 impl_to_perf_string!(f64);
 
 /// Represents a single service / resource from the perspective of Icinga.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Resource {
     name: String,
     results: Vec<CheckResult>,

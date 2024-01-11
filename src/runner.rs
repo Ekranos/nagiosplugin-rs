@@ -67,6 +67,7 @@ impl<E: Debug> Default for Runner<E> {
 }
 
 /// The result of a runner execution.
+#[derive(Debug)]
 pub enum RunnerResult<E> {
     /// The run was successful and it contains the returned [Resource].
     Ok(Resource),
