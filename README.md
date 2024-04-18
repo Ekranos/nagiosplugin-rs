@@ -10,13 +10,6 @@ A small helper library to make it easy to write nagios/icinga checks.
 
 [![Documentation](https://img.shields.io/badge/Documentation-docs.rs-blue)](https://docs.rs/nagiosplugin)
 
-# How to use
-
-Add the library to your `Cargo.toml`.
-
-    [dependencies]
-    nagiosplugin = "0.5"
-
 Currently the documentation is really scarce. Please take a look at the `examples`
 directory.
 
@@ -34,9 +27,9 @@ a PR which may get rejected.
 
 This project is licensed under either of
 
-* Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or
+- Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or
   http://www.apache.org/licenses/LICENSE-2.0)
-* MIT license ([LICENSE-MIT](LICENSE-MIT) or
+- MIT license ([LICENSE-MIT](LICENSE-MIT) or
   http://opensource.org/licenses/MIT)
 
 at your option.

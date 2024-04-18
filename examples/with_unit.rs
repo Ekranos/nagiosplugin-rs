@@ -1,9 +1,9 @@
 use std::error::Error;
 
-use nagiosplugin::{Metric, Resource, Runner, TriggerIfValue, Unit, UnitString};
+use nagiosplugin::{safe_run, Metric, Resource, ServiceState, TriggerIfValue, Unit, UnitString};
 
 fn main() {
-    Runner::new().safe_run(do_check).print_and_exit()
+    safe_run(do_check, ServiceState::Critical).print_and_exit()
 }
 
 fn do_check() -> Result<Resource, Box<dyn Error>> {

@@ -1,9 +1,9 @@
 use anyhow::anyhow;
 
-use nagiosplugin::{Resource, Runner};
+use nagiosplugin::{safe_run, Resource, ServiceState};
 
 fn main() {
-    Runner::new().safe_run(do_check).print_and_exit()
+    safe_run(do_check, ServiceState::Critical).print_and_exit()
 }
 
 // This example uses anyhow

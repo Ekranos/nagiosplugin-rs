@@ -1,16 +1,12 @@
 //! This crate provides utilities to write Icinga/Nagios checks/plugins.
 //! If you want to use this library only for compatible output take a look at the [Resource].
-//! If you also want error handling, take a look at the [Runner].
+//! If you also want error handling, take a look at [safe_run].
 use std::cmp::Ordering;
 use std::fmt;
 use std::fmt::Formatter;
 
-pub use runner::*;
-
 use crate::ServiceState::{Critical, Warning};
 use std::str::FromStr;
-
-mod runner;
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 /// Represents the state of a service / resource.
@@ -586,6 +582,60 @@ impl Resource {
     }
 }
 
+/// Helper function to safely run a check with a defined [ServiceState] on error and return a [RunResult] which can be used to print and exit.
+///
+/// ## Example
+///
+/// ```no_run
+/// use std::error::Error;
+///
+/// use nagiosplugin::{safe_run, Metric, Resource, ServiceState, TriggerIfValue};
+///
+/// fn main() {
+///     safe_run(do_check, ServiceState::Critical).print_and_exit()
+/// }
+///
+/// fn do_check() -> Result<Resource, Box<dyn Error>> {
+///    // The first metric will not issue an alarm, the second one will.
+///    let resource = Resource::new("foo")
+///         .with_description("This is a simple test plugin")
+///         .with_result(Metric::new("test", 15).with_thresholds(20, 50, TriggerIfValue::Greater))
+///         .with_result(Metric::new("alerting", 42).with_thresholds(40, 50, TriggerIfValue::Greater));
+///
+///     Ok(resource)
+/// }
+/// ```
+pub fn safe_run<E>(
+    f: impl FnOnce() -> Result<Resource, E>,
+    error_state: ServiceState,
+) -> RunResult<E> {
+    match f() {
+        Ok(resource) => RunResult::Ok(resource),
+        Err(err) => RunResult::Err(error_state, err),
+    }
+}
+
+/// The result of a runner execution.
+#[derive(Debug)]
+pub enum RunResult<E> {
+    /// The run was successful and it contains the returned [Resource].
+    Ok(Resource),
+    /// The run was not successful and it contains the [ServiceState] and the error.
+    Err(ServiceState, E),
+}
+
+impl<E: std::fmt::Display> RunResult<E> {
+    pub fn print_and_exit(self) -> ! {
+        match self {
+            RunResult::Ok(resource) => resource.print_and_exit(),
+            RunResult::Err(state, msg) => {
+                println!("{}: {}", state, msg);
+                std::process::exit(state.exit_code());
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -704,5 +754,31 @@ mod tests {
         result.perf_string.unwrap().0.contains("MB");
 
         assert_eq!(result.state, None);
+    }
+
+    #[derive(Debug, thiserror::Error)]
+    #[error("woops")]
+    struct EmptyError;
+
+    fn do_check(success: bool) -> Result<Resource, EmptyError> {
+        if success {
+            Ok(Resource::new("test"))
+        } else {
+            Err(EmptyError {})
+        }
+    }
+
+    #[test]
+    fn test_safe_run_ok() {
+        let result = safe_run(|| do_check(true), ServiceState::Critical);
+
+        matches!(result, RunResult::Ok(_));
+    }
+
+    #[test]
+    fn test_safe_run_error() {
+        let result = safe_run(|| do_check(false), ServiceState::Critical);
+
+        matches!(result, RunResult::Err(_, _));
     }
 }
