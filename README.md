@@ -10,9 +10,6 @@ A small helper library to make it easy to write nagios/icinga checks.
 
 [![Documentation](https://img.shields.io/badge/Documentation-docs.rs-blue)](https://docs.rs/nagiosplugin)
 
-Currently the documentation is really scarce. Please take a look at the `examples`
-directory.
-
 # Suggestions / Contributions?
 
 Submit an issue/PR. But in almost all cases it's better to first open
