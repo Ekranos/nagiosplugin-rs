@@ -8,6 +8,9 @@ use std::fmt::Formatter;
 use crate::ServiceState::{Critical, Warning};
 use std::str::FromStr;
 
+#[cfg(feature = "clap")]
+pub mod config_generator;
+
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 /// Represents the state of a service / resource.
 pub enum ServiceState {
