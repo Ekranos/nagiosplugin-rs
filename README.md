@@ -1,6 +1,6 @@
 # nagiosplugin-rs
 
-![crates.io nagiosplugin](https://img.shields.io/badge/crates.io-nagiosplugin-orange)
+[![crates.io nagiosplugin](https://img.shields.io/badge/crates.io-nagiosplugin-orange)](https://crates.io/crates/nagiosplugin)
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/ekranos/nagiosplugin-rs/test.yml?logo=github&label=test)
 ![license MIT](https://img.shields.io/badge/LICENSE-MIT-green)
 ![license APACHE2.0](https://img.shields.io/badge/LICENSE-APACHE2.0-green)
