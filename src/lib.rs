@@ -565,12 +565,20 @@ impl Resource {
             s
         };
 
-        let pad = if messages.is_empty() { "" } else { "\n\n" };
+        let mut result = String::new();
+        result.push_str(&description);
 
-        (
-            state,
-            format!("{}{}{}|{}", description, pad, messages.trim(), perf_string),
-        )
+        if !messages.is_empty() {
+            result.push_str("\n\n");
+            result.push_str(&messages);
+        }
+
+        if !perf_string.is_empty() {
+            result.push_str("|");
+            result.push_str(perf_string.trim());
+        }
+
+        (state, result)
     }
 
     /// Calls [Self::nagios_result] and prints the result to stdout. It will also exit with the
